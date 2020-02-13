@@ -9,6 +9,9 @@
                 {{ selectedDateStr === todayStr ? 'Today' : selectedDateStr }}
             </v-toolbar-title>
             <v-spacer/>
+            <v-btn icon v-if="notCompleted.length > 0" @click="moveNotCompleted(notCompleted)">
+                <v-icon>mdi-broom</v-icon>
+            </v-btn>
             <v-btn icon @click="showDateSelector = true">
                 <v-icon>mdi-calendar</v-icon>
             </v-btn>
@@ -17,9 +20,10 @@
         <v-content>
             <v-container>
                 <v-list dense class="pa-0">
-                    <v-list-item v-for="(entry) in selectedEntries" :key="entry.id" class="pl-0" @change="persist">
+                    <v-list-item v-for="(entry) in selectedEntries" :key="entry.id" class="pl-0"
+                                 @change="persist(selectedDateStr)">
                         <v-list-item-action class="mr-0" v-if="entry.isTodo">
-                            <v-checkbox v-model="entry.completed" />
+                            <v-checkbox v-model="entry.completed"/>
                         </v-list-item-action>
                         <v-textarea
                                 v-model="entry.text"
@@ -60,6 +64,11 @@
 </template>
 
 <script>
+
+    function genId() {
+        return `${Math.random().toString(36).slice(-8)}${Math.random().toString(36).slice(-8)}`;
+    }
+
     export default {
         name: 'App',
         data: () => ({
@@ -81,6 +90,22 @@
             });
         },
         computed: {
+            notCompleted() {
+                const notCompleted = [];
+                // Search for all to do items that hasn't been completed in the past
+                for (const [dateStr, entries] of Object.entries(this.allEntries)) {
+                    // Skip today or future
+                    if (dateStr === this.todayStr || new Date(dateStr) > new Date(this.todayStr)) {
+                        continue;
+                    }
+                    for (const entry of entries) {
+                        if (entry.isTodo && !entry.completed) {
+                            notCompleted.push({dateStr, entry});
+                        }
+                    }
+                }
+                return notCompleted;
+            },
             todayStr() {
                 return `${new Date().getFullYear()}-${("0" + (new Date().getMonth() + 1)).slice(-2)}-${new Date().getDate()}`;
             },
@@ -92,9 +117,30 @@
             'newEntry': 'newEntryUpdated',
         },
         methods: {
-            persist() {
+            moveNotCompleted(toCopyEntries) {
+                const newEntries = [];
+                for (const {dateStr, entry} of toCopyEntries) {
+                    // Clone entries to today's list
+                    newEntries.push({...entry, id: genId()});
+                    // Delete old
+                    const filteredEntries = this.allEntries[dateStr].filter((val) => {
+                        return val.id !== entry.id;
+                    });
+                    this.$set(this.allEntries, dateStr, filteredEntries);
+                }
+                this.$set(this.allEntries, this.todayStr, [...this.allEntries[this.todayStr], ...newEntries]);
+                this.persist();
+            },
+            persist(dateStr) {
                 const myStorage = window.localStorage;
-                myStorage.setItem(`TODO_${this.selectedDateStr}`, JSON.stringify(this.selectedEntries));
+
+                if (dateStr === undefined) {
+                    for (const [dateStr, entries] of Object.entries(this.allEntries)) {
+                        myStorage.setItem(`TODO_${dateStr}`, JSON.stringify(entries));
+                    }
+                } else if (typeof dateStr === 'string' && dateStr.length > 0) {
+                    myStorage.setItem(`TODO_${dateStr}`, JSON.stringify(this.allEntries[dateStr]));
+                }
             },
             newEntryUpdated(after, before) {
                 // do nothing on empty content
@@ -136,7 +182,7 @@
 
                 const newEntryObj = {
                     // Random id, hope it's unique enough..
-                    id: `${Math.random().toString(36).slice(-8)}${Math.random().toString(36).slice(-8)}`,
+                    id: genId(),
                     text,
                     createdAt: new Date(),
                     isTodo,
@@ -158,7 +204,9 @@
 
                 // Clear entry
                 this.newEntry = '';
-                this.persist();
+
+                // Save entry
+                this.persist(this.todayStr);
             }
         }
     };
