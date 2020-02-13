@@ -38,6 +38,9 @@
                                 @focus="showEntryMenu = entry.id"
                                 @blur="scheduleItemBlur(entry.id)"
                         />
+                        <small class="red--text" v-if="showEntryMenu !== entry.id">
+                            {{ entry.delayCount }}
+                        </small>
                         <v-list-item-action class="ml-0">
                             <v-btn v-show="showEntryMenu === entry.id" icon @click="deleteEntry(entry.id)">
                                 <v-icon>mdi-delete-outline</v-icon>
@@ -146,8 +149,10 @@
             moveNotCompleted(toCopyEntries) {
                 const newEntries = [];
                 for (const {dateStr, entry} of toCopyEntries) {
+                    // Keep track of how many times this task has been delayed
+                    const delayCount = entry.delayCount || 0;
                     // Clone entries to today's list
-                    newEntries.push({...entry, id: genId()});
+                    newEntries.push({...entry, id: genId(), delayCount: delayCount + 1});
                     // Delete old
                     const filteredEntries = this.allEntries[dateStr].filter((val) => {
                         return val.id !== entry.id;
