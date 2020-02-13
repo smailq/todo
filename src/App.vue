@@ -206,7 +206,7 @@
                 this.newEntry = '';
 
                 // Save entry
-                this.persist(this.todayStr);
+                this.persist(this.selectedDateStr);
             }
         }
     };
