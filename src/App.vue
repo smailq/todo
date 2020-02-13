@@ -9,7 +9,7 @@
                 {{ selectedDateStr === todayStr ? 'Today' : selectedDateStr }}
             </v-toolbar-title>
             <v-spacer/>
-            <v-btn icon v-if="notCompleted.length > 0" @click="moveNotCompleted(notCompleted)">
+            <v-btn icon v-if="notCompleted.length > 0 && selectedDateStr === todayStr" @click="moveNotCompleted(notCompleted)">
                 <v-icon>mdi-broom</v-icon>
             </v-btn>
             <v-btn icon @click="showDateSelector = true">
@@ -20,7 +20,7 @@
         <v-content>
             <v-container>
                 <v-list dense class="pa-0">
-                    <v-list-item v-for="(entry) in selectedEntries" :key="entry.id" class="pl-0"
+                    <v-list-item v-for="(entry) in selectedEntries" :key="entry.id" class="pl-0 pr-0"
                                  @change="persist(selectedDateStr)">
                         <v-list-item-action class="mr-0" v-if="entry.isTodo">
                             <v-checkbox v-model="entry.completed"/>
@@ -32,9 +32,17 @@
                                 solo
                                 full-width
                                 dense
+                                :outlined="showEntryMenu === entry.id"
                                 hide-details
                                 rows="1"
+                                @focus="showEntryMenu = entry.id"
+                                @blur="scheduleItemBlur(entry.id)"
                         />
+                        <v-list-item-action class="ml-0">
+                            <v-btn v-show="showEntryMenu === entry.id" icon @click="deleteEntry(entry.id)">
+                                <v-icon>mdi-delete-outline</v-icon>
+                            </v-btn>
+                        </v-list-item-action>
                     </v-list-item>
                 </v-list>
                 <v-list-item class="pl-0">
@@ -58,6 +66,7 @@
                 <v-bottom-sheet v-model="showDateSelector">
                     <v-date-picker v-model="selectedDateStr"/>
                 </v-bottom-sheet>
+
             </v-container>
         </v-content>
     </v-app>
@@ -76,6 +85,7 @@
             allEntries: {},
             selectedDateStr: '',
             showDateSelector: false,
+            showEntryMenu: false,
         }),
         mounted() {
             this.selectedDateStr = this.todayStr;
@@ -117,6 +127,22 @@
             'newEntry': 'newEntryUpdated',
         },
         methods: {
+            // Questionable hack to mitigate issue where 'blur' event is fired from selected textarea when
+            // buttons are clicked in same element - so delay 'de select' for click event to happen before
+            // item is de-selected
+            scheduleItemBlur(id) {
+                // to give other actions to be called, delay blur by some time
+                setTimeout(()=> {
+                    if (id === this.showEntryMenu) {
+                        this.showEntryMenu = false;
+                    }
+                }, 100); // is this enough time? seems to be so...
+            },
+            deleteEntry(id) {
+                console.log(id);
+                this.$set(this.allEntries, this.selectedDateStr, this.selectedEntries.filter((val) => val.id !== id));
+                this.persist(this.selectedDateStr);
+            },
             moveNotCompleted(toCopyEntries) {
                 const newEntries = [];
                 for (const {dateStr, entry} of toCopyEntries) {
