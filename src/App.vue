@@ -20,10 +20,10 @@
 
         <v-content>
             <v-container fill-height class="align-content-start pt-0">
-                <v-row>
-                    <v-col class="pa-0">
-                        <v-list dense>
+                <v-row class="ml-0">
+                        <v-list dense class="flex-grow-1">
                             <v-list-item v-for="(entry) in selectedEntries" :key="entry.id"
+                                         class="pl-0"
                                          @change="persist(selectedDateStr)">
                                 <v-list-item-action class="mr-0" v-if="entry.isTodo">
                                     <v-checkbox v-model="entry.completed"/>
@@ -48,14 +48,13 @@
                                 <small class="red--text" v-if="showEntryMenu !== entry.id">
                                     {{ entry.delayCount }}
                                 </small>
-                                <v-list-item-action class="ml-0">
-                                    <v-btn v-show="showEntryMenu === entry.id" icon @click="deleteEntry(entry.id)">
+                                <v-list-item-action v-show="showEntryMenu === entry.id" class="ml-0">
+                                    <v-btn icon @click="deleteEntry(entry.id)">
                                         <v-icon>mdi-delete-outline</v-icon>
                                     </v-btn>
                                 </v-list-item-action>
                             </v-list-item>
                         </v-list>
-                    </v-col>
                 </v-row>
                 <v-row>
                     <v-col class="pt-0">
@@ -64,7 +63,6 @@
                                 <v-checkbox/>
                             </v-list-item-action>
                             <v-textarea
-                                    outlined
                                     v-model="newEntry"
                                     auto-grow
                                     flat
@@ -269,6 +267,6 @@
 <style>
     .v-textarea.completed textarea {
         text-decoration: line-through;
-        color: grey;
+        color: gray!important;
     }
 </style>
