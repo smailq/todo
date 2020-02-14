@@ -6,15 +6,14 @@
                 dark
                 dense>
             <v-toolbar-title>
-                {{ selectedDateStr === todayStr ? 'Today' : selectedDateStr }}
+                {{ selectedDateStr === todayStr ? 'Today' : null }}
+                {{ selectedDateStr === tomorrowStr ? 'Tomorrow' : null }}
+                {{ selectedDateStr !== todayStr && selectedDateStr !== tomorrowStr ? selectedDateStr : null }}
             </v-toolbar-title>
             <v-spacer/>
             <v-btn icon v-if="notCompleted.length > 0 && selectedDateStr === todayStr"
                    @click="moveNotCompleted(notCompleted)">
-                <v-icon>mdi-broom</v-icon>
-            </v-btn>
-            <v-btn icon @click="showDateSelector = true">
-                <v-icon>mdi-calendar</v-icon>
+                <v-icon>mdi-application-import</v-icon>
             </v-btn>
         </v-app-bar>
 
@@ -23,7 +22,7 @@
                 <v-row class="ml-0">
                         <v-list dense class="flex-grow-1">
                             <v-list-item v-for="(entry) in selectedEntries" :key="entry.id"
-                                         class="pl-0"
+                                         class="pl-0 pr-0"
                                          @change="persist(selectedDateStr)">
                                 <v-list-item-action class="mr-0" v-if="entry.isTodo">
                                     <v-checkbox v-model="entry.completed"/>
@@ -59,7 +58,7 @@
                 <v-row>
                     <v-col class="pt-0">
                         <v-list-item class="pl-0">
-                            <v-list-item-action class="mr-3" v-if="newEntry.startsWith(' ')">
+                            <v-list-item-action class="mr-0" v-if="newEntry.startsWith(' ')">
                                 <v-checkbox/>
                             </v-list-item-action>
                             <v-textarea
@@ -83,6 +82,23 @@
                 </v-bottom-sheet>
             </v-container>
         </v-content>
+        <v-bottom-navigation
+                app
+                color="primary"
+                mandatory
+                v-model="bottomNavSelection"
+        >
+            <v-btn @click="showDateSelector = true" value="other">
+                <span>All dates</span>
+            </v-btn>
+            <v-btn value="today" @click="selectedDateStr = todayStr">
+                <span>Today</span>
+                <v-icon>mdi-calendar</v-icon>
+            </v-btn>
+            <v-btn value="tomorrow" @click="selectedDateStr = tomorrowStr">
+                <span>Tomorrow</span>
+            </v-btn>
+        </v-bottom-navigation>
     </v-app>
 </template>
 
@@ -95,6 +111,7 @@
     export default {
         name: 'App',
         data: () => ({
+            bottomNavSelection: 'today',
             newEntry: '',
             allEntries: {},
             selectedDateStr: '',
@@ -141,6 +158,13 @@
             },
             todayStr() {
                 return `${new Date().getFullYear()}-${("0" + (new Date().getMonth() + 1)).slice(-2)}-${new Date().getDate()}`;
+            },
+            tomorrowStr() {
+                const today = new Date();
+                const tomorrow = new Date(today);
+                tomorrow.setDate(tomorrow.getDate() + 1);
+
+                return `${tomorrow.getFullYear()}-${("0" + (tomorrow.getMonth() + 1)).slice(-2)}-${tomorrow.getDate()}`;
             },
             selectedEntries() {
                 if (this.selectedDateStr === '') {
