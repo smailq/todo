@@ -1,9 +1,6 @@
 <template>
     <v-app>
         <v-app-bar
-                v-touch="{
-            left: () => gotoNextDay(),
-                }"
                 app
                 color="primary"
                 dark
@@ -12,7 +9,8 @@
                 {{ selectedDateStr === todayStr ? 'Today' : selectedDateStr }}
             </v-toolbar-title>
             <v-spacer/>
-            <v-btn icon v-if="notCompleted.length > 0 && selectedDateStr === todayStr" @click="moveNotCompleted(notCompleted)">
+            <v-btn icon v-if="notCompleted.length > 0 && selectedDateStr === todayStr"
+                   @click="moveNotCompleted(notCompleted)">
                 <v-icon>mdi-broom</v-icon>
             </v-btn>
             <v-btn icon @click="showDateSelector = true">
@@ -24,10 +22,7 @@
             <v-container>
                 <v-list dense class="pa-0">
                     <v-list-item v-for="(entry) in selectedEntries" :key="entry.id" class="pl-0 pr-0"
-                                 @change="persist(selectedDateStr)"
-                    v-touch="{
-                              right:() => sendToFuture(entry.id),
-                                 }">
+                                 @change="persist(selectedDateStr)">
                         <v-list-item-action class="mr-0" v-if="entry.isTodo">
                             <v-checkbox v-model="entry.completed"/>
                         </v-list-item-action>
@@ -75,7 +70,6 @@
                 <v-bottom-sheet v-model="showDateSelector">
                     <v-date-picker v-model="selectedDateStr"/>
                 </v-bottom-sheet>
-
             </v-container>
         </v-content>
     </v-app>
@@ -99,6 +93,8 @@
         mounted() {
             this.selectedDateStr = this.todayStr;
 
+            console.debug('Start loading from local storage');
+
             const myStorage = window.localStorage;
             const keys = Object.entries(myStorage);
 
@@ -107,9 +103,13 @@
                     this.$set(this.allEntries, key.slice(5), JSON.parse(value));
                 }
             });
+
+            console.debug('Finished loading from local storage');
         },
         computed: {
             notCompleted() {
+                console.debug('Update notCompleted items from past');
+
                 const notCompleted = [];
                 // Search for all to do items that hasn't been completed in the past
                 for (const [dateStr, entries] of Object.entries(this.allEntries)) {
@@ -123,12 +123,18 @@
                         }
                     }
                 }
+
+                console.debug(`Finished loading ${notCompleted.length} notCompleted items`);
+
                 return notCompleted;
             },
             todayStr() {
                 return `${new Date().getFullYear()}-${("0" + (new Date().getMonth() + 1)).slice(-2)}-${new Date().getDate()}`;
             },
             selectedEntries() {
+                if (this.selectedDateStr === '') {
+                    return [];
+                }
                 return this.allEntries[this.selectedDateStr];
             }
         },
@@ -140,7 +146,6 @@
                 alert(' move to next day');
             },
             sendToFuture(id) {
-                console.log('Send to future - ', id);
                 alert('Coming soon - send this item to future');
             },
             // Questionable hack to mitigate issue where 'blur' event is fired from selected textarea when
@@ -148,14 +153,13 @@
             // item is de-selected
             scheduleItemBlur(id) {
                 // to give other actions to be called, delay blur by some time
-                setTimeout(()=> {
+                setTimeout(() => {
                     if (id === this.showEntryMenu) {
                         this.showEntryMenu = false;
                     }
                 }, 100); // is this enough time? seems to be so...
             },
             deleteEntry(id) {
-                console.log(id);
                 this.$set(this.allEntries, this.selectedDateStr, this.selectedEntries.filter((val) => val.id !== id));
                 this.persist(this.selectedDateStr);
             },
