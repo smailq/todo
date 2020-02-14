@@ -142,12 +142,6 @@
             'newEntry': 'newEntryUpdated',
         },
         methods: {
-            gotoNextDay() {
-                alert(' move to next day');
-            },
-            sendToFuture(id) {
-                alert('Coming soon - send this item to future');
-            },
             // Questionable hack to mitigate issue where 'blur' event is fired from selected textarea when
             // buttons are clicked in same element - so delay 'de select' for click event to happen before
             // item is de-selected
