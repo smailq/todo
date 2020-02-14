@@ -19,54 +19,67 @@
         </v-app-bar>
 
         <v-content>
-            <v-container>
-                <v-list dense class="pa-0">
-                    <v-list-item v-for="(entry) in selectedEntries" :key="entry.id" class="pl-0 pr-0"
-                                 @change="persist(selectedDateStr)">
-                        <v-list-item-action class="mr-0" v-if="entry.isTodo">
-                            <v-checkbox v-model="entry.completed"/>
-                        </v-list-item-action>
-                        <v-textarea
-                                v-model="entry.text"
-                                auto-grow
-                                flat
-                                solo
-                                full-width
-                                dense
-                                :outlined="showEntryMenu === entry.id"
-                                hide-details
-                                rows="1"
-                                @focus="showEntryMenu = entry.id"
-                                @blur="scheduleItemBlur(entry.id)"
-                        />
-                        <small class="red--text" v-if="showEntryMenu !== entry.id">
-                            {{ entry.delayCount }}
-                        </small>
-                        <v-list-item-action class="ml-0">
-                            <v-btn v-show="showEntryMenu === entry.id" icon @click="deleteEntry(entry.id)">
-                                <v-icon>mdi-delete-outline</v-icon>
-                            </v-btn>
-                        </v-list-item-action>
-                    </v-list-item>
-                </v-list>
-                <v-list-item class="pl-0">
-                    <v-list-item-action class="mr-0" v-if="newEntry.startsWith(' ')">
-                        <v-checkbox/>
-                    </v-list-item-action>
-                    <v-textarea
-                            v-model="newEntry"
-                            auto-grow
-                            flat
-                            solo
-                            clearable
-                            full-width
-                            dense
-                            hide-details
-                            rows="1"
-                            placeholder="New entry ..."
-                            class="font-italic"
-                    />
-                </v-list-item>
+            <v-container fill-height class="align-content-start pt-0">
+                <v-row>
+                    <v-col class="pa-0">
+                        <v-list dense>
+                            <v-list-item v-for="(entry) in selectedEntries" :key="entry.id"
+                                         @change="persist(selectedDateStr)">
+                                <v-list-item-action class="mr-0" v-if="entry.isTodo">
+                                    <v-checkbox v-model="entry.completed"/>
+                                </v-list-item-action>
+                                <span v-else class="title pl-2 pr-2">
+                                    &middot;
+                                </span>
+                                <v-textarea
+                                        :class="`${entry.completed && 'completed'}`"
+                                        v-model="entry.text"
+                                        auto-grow
+                                        flat
+                                        solo
+                                        full-width
+                                        dense
+                                        :outlined="showEntryMenu === entry.id"
+                                        hide-details
+                                        rows="1"
+                                        @focus="showEntryMenu = entry.id"
+                                        @blur="scheduleItemBlur(entry.id)"
+                                />
+                                <small class="red--text" v-if="showEntryMenu !== entry.id">
+                                    {{ entry.delayCount }}
+                                </small>
+                                <v-list-item-action class="ml-0">
+                                    <v-btn v-show="showEntryMenu === entry.id" icon @click="deleteEntry(entry.id)">
+                                        <v-icon>mdi-delete-outline</v-icon>
+                                    </v-btn>
+                                </v-list-item-action>
+                            </v-list-item>
+                        </v-list>
+                    </v-col>
+                </v-row>
+                <v-row>
+                    <v-col class="pt-0">
+                        <v-list-item class="pl-0">
+                            <v-list-item-action class="mr-3" v-if="newEntry.startsWith(' ')">
+                                <v-checkbox/>
+                            </v-list-item-action>
+                            <v-textarea
+                                    outlined
+                                    v-model="newEntry"
+                                    auto-grow
+                                    flat
+                                    solo
+                                    clearable
+                                    full-width
+                                    dense
+                                    hide-details
+                                    rows="1"
+                                    placeholder="New entry ..."
+                                    class="font-italic"
+                            />
+                        </v-list-item>
+                    </v-col>
+                </v-row>
                 <v-bottom-sheet v-model="showDateSelector">
                     <v-date-picker v-model="selectedDateStr"/>
                 </v-bottom-sheet>
@@ -253,3 +266,9 @@
         }
     };
 </script>
+<style>
+    .v-textarea.completed textarea {
+        text-decoration: line-through;
+        color: grey;
+    }
+</style>
