@@ -1,6 +1,9 @@
 <template>
     <v-app>
         <v-app-bar
+                v-touch="{
+            left: () => gotoNextDay(),
+                }"
                 app
                 color="primary"
                 dark
@@ -21,7 +24,10 @@
             <v-container>
                 <v-list dense class="pa-0">
                     <v-list-item v-for="(entry) in selectedEntries" :key="entry.id" class="pl-0 pr-0"
-                                 @change="persist(selectedDateStr)">
+                                 @change="persist(selectedDateStr)"
+                    v-touch="{
+                              right:() => sendToFuture(entry.id),
+                                 }">
                         <v-list-item-action class="mr-0" v-if="entry.isTodo">
                             <v-checkbox v-model="entry.completed"/>
                         </v-list-item-action>
@@ -130,6 +136,13 @@
             'newEntry': 'newEntryUpdated',
         },
         methods: {
+            gotoNextDay() {
+                alert(' move to next day');
+            },
+            sendToFuture(id) {
+                console.log('Send to future - ', id);
+                alert('Coming soon - send this item to future');
+            },
             // Questionable hack to mitigate issue where 'blur' event is fired from selected textarea when
             // buttons are clicked in same element - so delay 'de select' for click event to happen before
             // item is de-selected
