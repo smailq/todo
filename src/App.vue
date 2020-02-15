@@ -124,16 +124,8 @@
         <v-snackbar
                 v-model="showSnackbar"
                 bottom
-                color="info"
-        >
+                color="info">
             {{ snackbarText }}
-            <v-btn
-                    dark
-                    text
-                    @click="showSnackbar = false"
-            >
-                Close
-            </v-btn>
         </v-snackbar>
         <v-bottom-navigation
                 app
