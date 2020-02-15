@@ -93,7 +93,6 @@
             </v-btn>
             <v-btn value="today" @click="selectedDateStr = todayStr">
                 <span>Today</span>
-                <v-icon>mdi-calendar</v-icon>
             </v-btn>
             <v-btn value="tomorrow" @click="selectedDateStr = tomorrowStr">
                 <span>Tomorrow</span>
