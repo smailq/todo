@@ -99,15 +99,42 @@
                         </v-subheader>
                         <v-list-item v-for="entry in allEntries[dateStr]" :key="entry.id">
                             <v-list-item-action class="mr-2" v-if="entry.isTodo">
-                                <v-checkbox disabled :value="entry.completed"/>
+                                <v-checkbox disabled v-model="entry.completed"/>
                             </v-list-item-action>
                             <span v-else class="title pl-2 pr-4">&middot;</span>
-                            {{ entry.text }}
+                            <v-textarea
+                                    :class="`${entry.completed && 'completed'}`"
+                                    v-model="entry.text"
+                                    auto-grow
+                                    flat
+                                    solo
+                                    full-width
+                                    dense
+                                    hide-details
+                                    readonly
+                                    rows="1"
+                                    @click="copyContent"
+                            />
                         </v-list-item>
                     </v-list>
                 </v-card>
+
             </v-dialog>
         </v-content>
+        <v-snackbar
+                v-model="showSnackbar"
+                bottom
+                color="info"
+        >
+            {{ snackbarText }}
+            <v-btn
+                    dark
+                    text
+                    @click="showSnackbar = false"
+            >
+                Close
+            </v-btn>
+        </v-snackbar>
         <v-bottom-navigation
                 app
                 color="primary"
@@ -136,6 +163,8 @@
   export default {
     name: 'App',
     data: () => ({
+      showSnackbar: false,
+      snackbarText: '',
       bottomNavSelection: 'today',
       newEntry: '',
       allEntries: {},
@@ -211,6 +240,12 @@
       'newEntry': 'newEntryUpdated',
     },
     methods: {
+      copyContent(event) {
+          event.target.select();
+          document.execCommand('copy');
+          this.showSnackbar = true;
+          this.snackbarText = 'Copied to clipboard';
+      },
       // Questionable hack to mitigate issue where 'blur' event is fired from selected textarea when
       // buttons are clicked in same element - so delay 'de select' for click event to happen before
       // item is de-selected
@@ -239,8 +274,12 @@
           });
           this.$set(this.allEntries, dateStr, filteredEntries);
         }
-        this.$set(this.allEntries, this.todayStr, [...this.allEntries[this.todayStr], ...newEntries]);
+        const existingEntries = this.allEntries[this.todayStr] || [];
+        this.$set(this.allEntries, this.todayStr, [...existingEntries, ...newEntries]);
         this.persist();
+
+        this.snackbarText = 'Moved unfinished todo to today';
+        this.showSnackbar = true;
       },
       persist(dateStr) {
         const myStorage = window.localStorage;
