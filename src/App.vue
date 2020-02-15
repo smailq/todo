@@ -83,7 +83,7 @@
                 </v-bottom-sheet>
             </v-container>
             <v-dialog v-model="showListView" fullscreen hide-overlay transition="dialog-bottom-transition">
-                <v-card>
+                <v-card tile>
                     <v-toolbar dark color="secondary">
                         <v-toolbar-title>
                             All Entries
