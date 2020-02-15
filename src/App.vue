@@ -142,7 +142,7 @@
       selectedDateStr: '',
       showDateSelector: false,
       showEntryMenu: false,
-      showListView: true,
+      showListView: false,
     }),
     mounted() {
       this.selectedDateStr = this.todayStr;
