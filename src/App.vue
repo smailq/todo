@@ -15,6 +15,9 @@
                    @click="moveNotCompleted(notCompleted)">
                 <v-icon>mdi-application-import</v-icon>
             </v-btn>
+            <v-btn icon @click="showListView = true">
+                <v-icon>mdi-format-list-bulleted</v-icon>
+            </v-btn>
         </v-app-bar>
 
         <v-content>
@@ -79,6 +82,31 @@
                     <v-date-picker v-model="selectedDateStr"/>
                 </v-bottom-sheet>
             </v-container>
+            <v-dialog v-model="showListView" fullscreen hide-overlay transition="dialog-bottom-transition">
+                <v-card>
+                    <v-toolbar dark color="secondary">
+                        <v-toolbar-title>
+                            All Entries
+                        </v-toolbar-title>
+                        <v-spacer/>
+                        <v-btn icon dark @click="showListView = false">
+                            <v-icon>mdi-close</v-icon>
+                        </v-btn>
+                    </v-toolbar>
+                    <v-list v-for="dateStr in allDates" :key="dateStr">
+                        <v-subheader>
+                            {{ dateStr }}
+                        </v-subheader>
+                        <v-list-item v-for="entry in allEntries[dateStr]" :key="entry.id">
+                            <v-list-item-action class="mr-2" v-if="entry.isTodo">
+                                <v-checkbox disabled :value="entry.completed"/>
+                            </v-list-item-action>
+                            <span v-else class="title pl-2 pr-4">&middot;</span>
+                            {{ entry.text }}
+                        </v-list-item>
+                    </v-list>
+                </v-card>
+            </v-dialog>
         </v-content>
         <v-bottom-navigation
                 app
@@ -114,6 +142,7 @@
       selectedDateStr: '',
       showDateSelector: false,
       showEntryMenu: false,
+      showListView: true,
     }),
     mounted() {
       this.selectedDateStr = this.todayStr;
@@ -132,9 +161,19 @@
       console.debug('Finished loading from local storage');
     },
     computed: {
+      allDates() {
+        // Most recent first
+        return Object.keys(this.allEntries).sort((b, a) => {
+            if (new Date(a) < new Date(b)) {
+                return -1;
+            } else if (new Date(a) > new Date(b)) {
+                return 1;
+            }
+            return 0;
+        });
+      },
       notCompleted() {
         console.debug('Update notCompleted items from past');
-
         const notCompleted = [];
         // Search for all to do items that hasn't been completed in the past
         for (const [dateStr, entries] of Object.entries(this.allEntries)) {
@@ -148,9 +187,7 @@
             }
           }
         }
-
         console.debug(`Finished loading ${notCompleted.length} notCompleted items`);
-
         return notCompleted;
       },
       todayStr() {
