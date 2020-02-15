@@ -6,9 +6,7 @@
                 dark
                 dense>
             <v-toolbar-title>
-                {{ selectedDateStr === todayStr ? 'Today' : null }}
-                {{ selectedDateStr === tomorrowStr ? 'Tomorrow' : null }}
-                {{ selectedDateStr !== todayStr && selectedDateStr !== tomorrowStr ? selectedDateStr : null }}
+                {{ appBarTitle }}
             </v-toolbar-title>
             <v-spacer/>
             <v-btn icon v-if="notCompleted.length > 0 && selectedDateStr === todayStr"
@@ -21,7 +19,12 @@
         </v-app-bar>
 
         <v-content>
-            <v-container fill-height class="align-content-start pt-0">
+            <v-container fill-height class="align-content-start pt-0"
+                         v-touch="{
+                    left: () => switchDate(1),
+                    right: () => switchDate(-1),
+                }"
+            >
                 <v-row class="ml-0">
                     <v-list dense class="flex-grow-1">
                         <v-list-item v-for="(entry) in selectedEntries" :key="entry.id"
@@ -78,9 +81,6 @@
                         />
                     </v-list-item>
                 </v-row>
-                <v-bottom-sheet v-model="showDateSelector">
-                    <v-date-picker v-model="selectedDateStr"/>
-                </v-bottom-sheet>
             </v-container>
             <v-dialog v-model="showListView" fullscreen hide-overlay transition="dialog-bottom-transition">
                 <v-card tile>
@@ -118,31 +118,15 @@
                         </v-list-item>
                     </v-list>
                 </v-card>
-
             </v-dialog>
         </v-content>
         <v-snackbar
                 v-model="showSnackbar"
                 bottom
+                :timeout=2500
                 color="info">
             {{ snackbarText }}
         </v-snackbar>
-        <v-bottom-navigation
-                app
-                color="primary"
-                mandatory
-                v-model="bottomNavSelection"
-        >
-            <v-btn @click="showDateSelector = true" value="other">
-                <span>All dates</span>
-            </v-btn>
-            <v-btn value="today" @click="selectedDateStr = todayStr">
-                <span>Today</span>
-            </v-btn>
-            <v-btn value="tomorrow" @click="selectedDateStr = tomorrowStr">
-                <span>Tomorrow</span>
-            </v-btn>
-        </v-bottom-navigation>
     </v-app>
 </template>
 
@@ -157,11 +141,9 @@
     data: () => ({
       showSnackbar: false,
       snackbarText: '',
-      bottomNavSelection: 'today',
       newEntry: '',
       allEntries: {},
       selectedDateStr: '',
-      showDateSelector: false,
       showEntryMenu: false,
       showListView: false,
     }),
@@ -212,14 +194,28 @@
         return notCompleted;
       },
       todayStr() {
-        return `${new Date().getFullYear()}-${('0' + (new Date().getMonth() + 1)).slice(-2)}-${new Date().getDate()}`;
+        return new Date().toISOString().slice(0, 10);
       },
       tomorrowStr() {
-        const today = new Date();
-        const tomorrow = new Date(today);
+        const tomorrow = new Date(this.todayStr);
         tomorrow.setDate(tomorrow.getDate() + 1);
-
-        return `${tomorrow.getFullYear()}-${('0' + (tomorrow.getMonth() + 1)).slice(-2)}-${tomorrow.getDate()}`;
+        return tomorrow.toISOString().slice(0, 10);
+      },
+      yesterdayStr() {
+        const yesterday = new Date(this.todayStr);
+        yesterday.setDate(yesterday.getDate() - 1);
+        return yesterday.toISOString().slice(0, 10);
+      },
+      appBarTitle() {
+        if (this.selectedDateStr === this.todayStr) {
+            return 'Today';
+        } else if (this.selectedDateStr === this.tomorrowStr) {
+            return 'Tomorrow';
+        } else if (this.selectedDateStr === this.yesterdayStr) {
+            return 'Yesterday';
+        } else {
+            return this.selectedDateStr;
+        }
       },
       selectedEntries() {
         if (this.selectedDateStr === '') {
@@ -232,6 +228,13 @@
       'newEntry': 'newEntryUpdated',
     },
     methods: {
+        switchDate(days) {
+            const newDate = new Date(this.selectedDateStr);
+            newDate.setDate(newDate.getDate() + days);
+            this.selectedDateStr = newDate.toISOString().slice(0, 10);
+            // const date = `${tomorrow.getFullYear()}-${('0' + (tomorrow.getMonth() + 1)).slice(-2)}-${tomorrow.getDate()}`;
+            // this.selectedDateStr = date;
+        },
       copyContent(event) {
           event.target.select();
           document.execCommand('copy');
