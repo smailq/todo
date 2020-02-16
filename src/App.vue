@@ -2,7 +2,7 @@
     <v-app>
         <v-app-bar
                 app
-                :color="selectedEntryId === false ? 'primary' : 'grey darken-1'"
+                :color="selectedEntryId === false ? (notesMode ? 'light-green' : 'primary') : 'blue-grey'"
                 dark
                 dense>
             <v-btn icon v-if="selectedEntryId !== false"
@@ -23,7 +23,7 @@
                 </v-btn>
             </div>
             <div v-else>
-                <v-menu bottom left>
+                <v-menu bottom left v-if="datesMode">
                     <template v-slot:activator="{ on }">
                         <v-btn icon v-on="on">
                             <v-icon>mdi-clock</v-icon>
@@ -62,6 +62,7 @@
                          v-touch="{
                     left: () => selectNextDay(),
                     right: () => selectPrevDay(),
+                    up: () => switchMode(),
                 }"
             >
                 <v-row class="ml-0">
@@ -116,9 +117,32 @@
                     </v-list-item>
                 </v-row>
             </v-container>
+
+            <v-dialog v-model="showNoteSelectionView" fullscreen hide-overlay transition="dialog-bottom-transition">
+                <v-card tile>
+                    <v-toolbar dark color="light-green" dense>
+                        <v-toolbar-title>
+                            All Notes
+                        </v-toolbar-title>
+                        <v-spacer/>
+                        <v-btn icon dark @click="showNoteSelectionView = false">
+                            <v-icon>mdi-close</v-icon>
+                        </v-btn>
+                    </v-toolbar>
+                    <v-list>
+                        <v-list-item @click="selectNote('New note')">
+                            <v-list-item-content>
+                                <v-list-item-title>
+                                    Note name 1
+                                </v-list-item-title>
+                            </v-list-item-content>
+                        </v-list-item>
+                    </v-list>
+                </v-card>
+            </v-dialog>
             <v-dialog v-model="showListView" fullscreen hide-overlay transition="dialog-bottom-transition">
                 <v-card tile>
-                    <v-toolbar dark color="secondary">
+                    <v-toolbar dark color="indigo" dense>
                         <v-toolbar-title>
                             All Entries
                         </v-toolbar-title>
@@ -127,35 +151,47 @@
                             <v-icon>mdi-close</v-icon>
                         </v-btn>
                     </v-toolbar>
-                    <v-list v-for="dateStr in allDates" :key="dateStr">
-                        <v-divider v-if="dateStr === todayStr" />
-                        <v-subheader @click="selectDay(dateStr)" :class="`darken-3 ${ dateStr > todayStr ? 'green--text' : ''} ${ dateStr === todayStr ? 'font-weight-bold' : ''}`">
-                            {{ dateStr | format_moment('ddd, MMM Do, YYYY')}}{{ dateStr === todayStr ? ' &middot; Today' : ''}}
-                        </v-subheader>
-                        <v-list-item v-for="entry in allEntries[dateStr]" :key="entry.id">
-                            <v-list-item-action class="mr-2" v-if="entry.isTodo">
-                                <v-checkbox disabled v-model="entry.completed"/>
-                            </v-list-item-action>
-                            <span v-else class="title pl-2 pr-4">&middot;</span>
-                            <v-textarea
-                                    :class="`${entry.completed && 'completed'}`"
-                                    v-model="entry.text"
-                                    auto-grow
-                                    flat
-                                    solo
-                                    full-width
-                                    dense
-                                    hide-details
-                                    readonly
-                                    rows="1"
-                                    @click="copyContent"
-                            />
-                        </v-list-item>
-                        <v-divider v-if="dateStr === todayStr" />
-                    </v-list>
+                    <div v-if="datesMode">
+                        <v-list v-for="dateStr in allDates" :key="dateStr">
+                            <v-divider v-if="dateStr === todayStr"/>
+                            <v-subheader @click="selectDay(dateStr)" v-if="datesMode"
+                                         :class="`darken-3 ${ dateStr > todayStr ? 'green--text' : ''} ${ dateStr === todayStr ? 'font-weight-bold' : ''}`">
+                                {{ dateStr | format_moment('ddd, MMM Do, YYYY')}}{{ dateStr === todayStr ? ' &middot; Today' : ''}}
+                            </v-subheader>
+                            <v-list-item v-for="entry in allEntries[dateStr]" :key="entry.id">
+                                <v-list-item-action class="mr-2" v-if="entry.isTodo">
+                                    <v-checkbox disabled v-model="entry.completed"/>
+                                </v-list-item-action>
+                                <span v-else class="title pl-2 pr-4">&middot;</span>
+                                <v-textarea
+                                        :class="`${entry.completed && 'completed'}`"
+                                        v-model="entry.text"
+                                        auto-grow
+                                        flat
+                                        solo
+                                        full-width
+                                        dense
+                                        hide-details
+                                        readonly
+                                        rows="1"
+                                        @click="copyContent"
+                                />
+                            </v-list-item>
+                            <v-divider v-if="dateStr === todayStr"/>
+                        </v-list>
+                    </div>
+                    <div v-if="notesMode">
+                        <v-list>
+                            <v-list-item v-for="noteName in allNotes" :key="noteName">
+                                <v-list-item-title>
+                                    {{ noteName }}
+                                </v-list-item-title>
+                            </v-list-item>
+                        </v-list>
+                    </div>
                 </v-card>
             </v-dialog>
-            <v-bottom-sheet v-model="showMoveToDateCalendar">
+            <v-bottom-sheet v-if="datesMode" v-model="showMoveToDateCalendar">
                 <v-date-picker v-model="moveToDateTargetStr"/>
                 <v-row justify="center">
                     <v-btn class="ma-3" color="primary" @click="moveSelectedEntryTo(moveToDateTargetStr)">
@@ -193,6 +229,7 @@
             showListView: false,
             showMoveToDateCalendar: false,
             moveToDateTargetStr: moment().format('YYYY-MM-DD'),
+            showNoteSelectionView: false,
         }),
         mounted() {
             this.selectedDateStr = this.todayStr;
@@ -211,9 +248,17 @@
             console.debug('Finished loading from local storage');
         },
         computed: {
+            datesMode() {
+                return /^\d\d\d\d-\d\d-\d\d$/.test(this.selectedDateStr);
+            },
+            notesMode() {
+                return !this.datesMode;
+            },
             allDates() {
                 // Most recent first
-                return Object.keys(this.allEntries).sort((b, a) => {
+                return Object.keys(this.allEntries)
+                    .filter(key => /^\d\d\d\d-\d\d-\d\d$/.test(key))
+                    .sort((b, a) => {
                     if (new Date(a) < new Date(b)) {
                         return -1;
                     } else if (new Date(a) > new Date(b)) {
@@ -222,11 +267,18 @@
                     return 0;
                 });
             },
+            allNotes() {
+                return Object.keys(this.allEntries)
+                    .filter(key => !/^\d\d\d\d-\d\d-\d\d$/.test(key));
+            },
             notCompleted() {
                 console.debug('Update notCompleted items from past');
                 const notCompleted = [];
                 // Search for all to do items that hasn't been completed in the past
                 for (const [dateStr, entries] of Object.entries(this.allEntries)) {
+                    if (!(/^\d\d\d\d-\d\d-\d\d$/.test(dateStr))) {
+                        continue; // If the entry is not a date, don't count
+                    }
                     // Skip today or future
                     if (dateStr === this.todayStr || new Date(dateStr) > new Date(this.todayStr)) {
                         continue;
@@ -242,14 +294,6 @@
             },
             todayStr() {
                 return moment().format('YYYY-MM-DD');
-            },
-            tomorrowStr() {
-                const tomorrow = moment(this.todayStr).add(1, 'd');
-                return tomorrow.format('YYYY-MM-DD');
-            },
-            yesterdayStr() {
-                const yesterday = moment(this.todayStr).subtract(1, 'd');
-                return yesterday.format('YYYY-MM-DD');
             },
             nextMondayStr() {
                 const nextMonday = moment(this.todayStr).day(7 + 1);
@@ -268,19 +312,27 @@
                 return '';
             },
             appBarTitle() {
-                const dayDiff = moment(this.selectedDateStr).diff(moment(this.todayStr), 'days');
-                if (dayDiff === 0) {
-                    return 'Today';
-                } else if (dayDiff === 1) {
-                    return 'Tomorrow';
-                } else if (dayDiff === -1) {
-                    return 'Yesterday';
-                } else {
-                    return `${dayDiff > 0 ? 'In ' : ''}${Math.abs(dayDiff)} days${dayDiff < 0 ? ' ago' : ''}`
+                if (/^\d\d\d\d-\d\d-\d\d$/.test(this.selectedDateStr)) {
+                    const dayDiff = moment(this.selectedDateStr).diff(moment(this.todayStr), 'days');
+                    if (dayDiff === 0) {
+                        return 'Today';
+                    } else if (dayDiff === 1) {
+                        return 'Tomorrow';
+                    } else if (dayDiff === -1) {
+                        return 'Yesterday';
+                    } else {
+                        return `${dayDiff > 0 ? 'In ' : ''}${Math.abs(dayDiff)} days${dayDiff < 0 ? ' ago' : ''}`
+                    }
                 }
+
+                return this.selectedDateStr;
             },
             appBarSubtitle() {
-                return moment(this.selectedDateStr).format('ddd, MMM Do');
+                if (/^\d\d\d\d-\d\d-\d\d$/.test(this.selectedDateStr)) {
+                    return moment(this.selectedDateStr).format('ddd, MMM Do');
+                }
+
+                return '';
             },
             selectedEntries() {
                 if (this.selectedDateStr === '') {
@@ -293,6 +345,17 @@
             'newEntry': 'newEntryUpdated',
         },
         methods: {
+            selectNote(name) {
+                this.selectedDateStr = name;
+                this.showNoteSelectionView = false;
+            },
+            switchMode() {
+                if (/^\d\d\d\d-\d\d-\d\d$/.test(this.selectedDateStr)) {
+                    this.showNoteSelectionView = true;
+                } else {
+                    this.selectedDateStr = this.todayStr;
+                }
+            },
             moveSelectedEntryTo(dateStr) {
                 console.log(`Moving item ${this.selectedEntryId} to ${dateStr}`);
 
@@ -324,12 +387,16 @@
                 console.log(`Move successful`);
             },
             selectNextDay() {
-                const newDate = moment(this.selectedDateStr).add(1, 'd');
-                this.selectedDateStr = newDate.format('YYYY-MM-DD');
+                if (/^\d\d\d\d-\d\d-\d\d$/.test(this.selectedDateStr)) {
+                    const newDate = moment(this.selectedDateStr).add(1, 'd');
+                    this.selectedDateStr = newDate.format('YYYY-MM-DD');
+                }
             },
             selectPrevDay() {
-                const newDate = moment(this.selectedDateStr).subtract(1, 'd');
-                this.selectedDateStr = newDate.format('YYYY-MM-DD');
+                if (/^\d\d\d\d-\d\d-\d\d$/.test(this.selectedDateStr)) {
+                    const newDate = moment(this.selectedDateStr).subtract(1, 'd');
+                    this.selectedDateStr = newDate.format('YYYY-MM-DD');
+                }
             },
             selectDay(dateStr) {
                 this.selectedDateStr = dateStr;
