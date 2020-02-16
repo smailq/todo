@@ -128,6 +128,7 @@
                         </v-btn>
                     </v-toolbar>
                     <v-list v-for="dateStr in allDates" :key="dateStr">
+                        <v-divider v-if="dateStr === todayStr" />
                         <v-subheader @click="selectDay(dateStr)" :class="`darken-3 ${ dateStr > todayStr ? 'green--text' : ''} ${ dateStr === todayStr ? 'font-weight-bold' : ''}`">
                             {{ dateStr | format_moment('ddd, MMM Do, YYYY')}}{{ dateStr === todayStr ? ' &middot; Today' : ''}}
                         </v-subheader>
@@ -150,7 +151,7 @@
                                     @click="copyContent"
                             />
                         </v-list-item>
-                        <v-divider v-if="dateStr === todayStr || dateStr === tomorrowStr"/>
+                        <v-divider v-if="dateStr === todayStr" />
                     </v-list>
                 </v-card>
             </v-dialog>
