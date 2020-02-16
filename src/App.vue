@@ -128,8 +128,8 @@
                         </v-btn>
                     </v-toolbar>
                     <v-list v-for="dateStr in allDates" :key="dateStr">
-                        <v-subheader @click="selectDay(dateStr)">
-                            {{ dateStr }}
+                        <v-subheader @click="selectDay(dateStr)" :class="`darken-3 ${ dateStr > todayStr ? 'green--text' : ''} ${ dateStr === todayStr ? 'font-weight-bold' : ''}`">
+                            {{ dateStr | format_moment('ddd, MMM Do, YYYY')}}
                         </v-subheader>
                         <v-list-item v-for="entry in allEntries[dateStr]" :key="entry.id">
                             <v-list-item-action class="mr-2" v-if="entry.isTodo">
