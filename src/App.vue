@@ -33,13 +33,15 @@
                         <v-list-item two-line v-if="nextMondayStr !== ''" @click="moveSelectedEntryTo(nextMondayStr)">
                             <v-list-item-content>
                                 <v-list-item-title>Next week</v-list-item-title>
-                                <v-list-item-subtitle>{{ nextMondayStr | format_moment('ddd, MMM Do') }}</v-list-item-subtitle>
+                                <v-list-item-subtitle>{{ nextMondayStr | format_moment('ddd, MMM Do') }}
+                                </v-list-item-subtitle>
                             </v-list-item-content>
                         </v-list-item>
                         <v-list-item v-if="nextSaturdayStr !== ''" @click="moveSelectedEntryTo(nextSaturdayStr)">
                             <v-list-item-content>
                                 <v-list-item-title>Next weekend</v-list-item-title>
-                                <v-list-item-subtitle>{{ nextSaturdayStr | format_moment('ddd, MMM Do') }}</v-list-item-subtitle>
+                                <v-list-item-subtitle>{{ nextSaturdayStr | format_moment('ddd, MMM Do') }}
+                                </v-list-item-subtitle>
                             </v-list-item-content>
                         </v-list-item>
                         <v-list-item @click="showMoveToDateCalendar = true">
@@ -153,11 +155,11 @@
             </v-dialog>
             <v-bottom-sheet v-model="showMoveToDateCalendar">
                 <v-date-picker v-model="moveToDateTargetStr"/>
-            <v-row justify="center">
-                <v-btn class="ma-3" color="primary" @click="moveSelectedEntryTo(moveToDateTargetStr)">
-                    Move
-                </v-btn>
-            </v-row>
+                <v-row justify="center">
+                    <v-btn class="ma-3" color="primary" @click="moveSelectedEntryTo(moveToDateTargetStr)">
+                        Move
+                    </v-btn>
+                </v-row>
             </v-bottom-sheet>
         </v-content>
         <v-snackbar
@@ -264,22 +266,19 @@
                 return '';
             },
             appBarTitle() {
-                if (this.selectedDateStr === this.todayStr) {
+                const dayDiff = moment(this.selectedDateStr).diff(moment(this.todayStr), 'days');
+                if (dayDiff === 0) {
                     return 'Today';
-                } else if (this.selectedDateStr === this.tomorrowStr) {
+                } else if (dayDiff === 1) {
                     return 'Tomorrow';
-                } else if (this.selectedDateStr === this.yesterdayStr) {
+                } else if (dayDiff === -1) {
                     return 'Yesterday';
                 } else {
-                    return this.selectedDateStr;
+                    return `${dayDiff > 0 ? 'In ' : ''}${Math.abs(dayDiff)} days${dayDiff < 0 ? ' ago' : ''}`
                 }
             },
             appBarSubtitle() {
-                const dayDiff = moment(this.selectedDateStr).diff(moment(this.todayStr), 'days');
-                if (Math.abs(dayDiff) > 1) {
-                    return `${dayDiff > 0 ? 'in ' : ''}${Math.abs(dayDiff)} days${dayDiff < 0 ? ' ago' : ''}`;
-                }
-                return '';
+                return moment(this.selectedDateStr).format('ddd, MMM Do');
             },
             selectedEntries() {
                 if (this.selectedDateStr === '') {
@@ -323,8 +322,8 @@
                 console.log(`Move successful`);
             },
             selectNextDay() {
-              const newDate = moment(this.selectedDateStr).add(1, 'd');
-              this.selectedDateStr = newDate.format('YYYY-MM-DD');
+                const newDate = moment(this.selectedDateStr).add(1, 'd');
+                this.selectedDateStr = newDate.format('YYYY-MM-DD');
             },
             selectPrevDay() {
                 const newDate = moment(this.selectedDateStr).subtract(1, 'd');
