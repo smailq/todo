@@ -23,6 +23,32 @@
                 </v-btn>
             </div>
             <div v-else>
+                <v-menu bottom left>
+                    <template v-slot:activator="{ on }">
+                        <v-btn icon v-on="on">
+                            <v-icon>mdi-clock</v-icon>
+                        </v-btn>
+                    </template>
+                    <v-list>
+                        <v-list-item two-line v-if="nextMondayStr !== ''" @click="moveSelectedEntryTo(nextMondayStr)">
+                            <v-list-item-content>
+                                <v-list-item-title>Next week</v-list-item-title>
+                                <v-list-item-subtitle>{{ nextMondayStr | format_moment('ddd, MMM Do') }}</v-list-item-subtitle>
+                            </v-list-item-content>
+                        </v-list-item>
+                        <v-list-item v-if="nextSaturdayStr !== ''" @click="moveSelectedEntryTo(nextSaturdayStr)">
+                            <v-list-item-content>
+                                <v-list-item-title>Next weekend</v-list-item-title>
+                                <v-list-item-subtitle>{{ nextSaturdayStr | format_moment('ddd, MMM Do') }}</v-list-item-subtitle>
+                            </v-list-item-content>
+                        </v-list-item>
+                        <v-list-item @click="showMoveToDateCalendar = true">
+                            <v-list-item-content>
+                                <v-list-item-title>Select date</v-list-item-title>
+                            </v-list-item-content>
+                        </v-list-item>
+                    </v-list>
+                </v-menu>
                 <v-btn icon @click="deleteSelectedEntry()">
                     <v-icon>mdi-delete-outline</v-icon>
                 </v-btn>
@@ -32,8 +58,8 @@
         <v-content>
             <v-container fill-height class="align-content-start pt-0"
                          v-touch="{
-                    left: () => switchDate(1),
-                    right: () => switchDate(-1),
+                    left: () => selectNextDay(),
+                    right: () => selectPrevDay(),
                 }"
             >
                 <v-row class="ml-0">
@@ -100,7 +126,7 @@
                         </v-btn>
                     </v-toolbar>
                     <v-list v-for="dateStr in allDates" :key="dateStr">
-                        <v-subheader>
+                        <v-subheader @click="selectDay(dateStr)">
                             {{ dateStr }}
                         </v-subheader>
                         <v-list-item v-for="entry in allEntries[dateStr]" :key="entry.id">
@@ -125,11 +151,19 @@
                     </v-list>
                 </v-card>
             </v-dialog>
+            <v-bottom-sheet v-model="showMoveToDateCalendar">
+                <v-date-picker v-model="moveToDateTargetStr"/>
+            <v-row justify="center">
+                <v-btn class="ma-3" color="primary" @click="moveSelectedEntryTo(moveToDateTargetStr)">
+                    Move
+                </v-btn>
+            </v-row>
+            </v-bottom-sheet>
         </v-content>
         <v-snackbar
                 v-model="showSnackbar"
                 bottom
-                :timeout=2500
+                :timeout=4000
                 color="info">
             {{ snackbarText }}
         </v-snackbar>
@@ -137,6 +171,7 @@
 </template>
 
 <script>
+    const moment = require('moment');
 
     function genId() {
         return `${Math.random().toString(36).slice(-8)}${Math.random().toString(36).slice(-8)}`;
@@ -152,6 +187,8 @@
             selectedDateStr: '',
             selectedEntryId: false,
             showListView: false,
+            showMoveToDateCalendar: false,
+            moveToDateTargetStr: moment().format('YYYY-MM-DD'),
         }),
         mounted() {
             this.selectedDateStr = this.todayStr;
@@ -200,17 +237,31 @@
                 return notCompleted;
             },
             todayStr() {
-                return new Date().toISOString().slice(0, 10);
+                return moment().format('YYYY-MM-DD');
             },
             tomorrowStr() {
-                const tomorrow = new Date(this.todayStr);
-                tomorrow.setDate(tomorrow.getDate() + 1);
-                return tomorrow.toISOString().slice(0, 10);
+                const tomorrow = moment(this.todayStr).add(1, 'd');
+                return tomorrow.format('YYYY-MM-DD');
             },
             yesterdayStr() {
-                const yesterday = new Date(this.todayStr);
-                yesterday.setDate(yesterday.getDate() - 1);
-                return yesterday.toISOString().slice(0, 10);
+                const yesterday = moment(this.todayStr).subtract(1, 'd');
+                return yesterday.format('YYYY-MM-DD');
+            },
+            nextMondayStr() {
+                const nextMonday = moment(this.todayStr).day(7 + 1);
+                if (nextMonday > moment()) {
+                    return nextMonday.format('YYYY-MM-DD');
+                }
+                // If this friday is past or same day, ignore
+                return '';
+            },
+            nextSaturdayStr() {
+                const nextSaturday = moment(this.todayStr).day(7 + 6);
+                if (nextSaturday > moment()) {
+                    return nextSaturday.format('YYYY-MM-DD');
+                }
+                // If this friday is past or same day, ignore
+                return '';
             },
             appBarTitle() {
                 if (this.selectedDateStr === this.todayStr) {
@@ -224,8 +275,7 @@
                 }
             },
             appBarSubtitle() {
-                const milliSecDiff = new Date(this.selectedDateStr) - new Date(this.todayStr);
-                const dayDiff = milliSecDiff / 1000 / 60 / 60 / 24;
+                const dayDiff = moment(this.selectedDateStr).diff(moment(this.todayStr), 'days');
                 if (Math.abs(dayDiff) > 1) {
                     return `${dayDiff > 0 ? 'in ' : ''}${Math.abs(dayDiff)} days${dayDiff < 0 ? ' ago' : ''}`;
                 }
@@ -242,12 +292,50 @@
             'newEntry': 'newEntryUpdated',
         },
         methods: {
-            switchDate(days) {
-                const newDate = new Date(this.selectedDateStr);
-                newDate.setDate(newDate.getDate() + days);
-                this.selectedDateStr = newDate.toISOString().slice(0, 10);
-                // const date = `${tomorrow.getFullYear()}-${('0' + (tomorrow.getMonth() + 1)).slice(-2)}-${tomorrow.getDate()}`;
-                // this.selectedDateStr = date;
+            moveSelectedEntryTo(dateStr) {
+                console.log(`Moving item ${this.selectedEntryId} to ${dateStr}`);
+
+                const entry = this.allEntries[this.selectedDateStr].find((val) => val.id === this.selectedEntryId);
+
+                if (entry === undefined) {
+                    alert('Sorry, couldn\'t find item to be moved');
+                    return;
+                }
+
+                // Remove from source
+                this.$set(this.allEntries, this.selectedDateStr, this.allEntries[this.selectedDateStr].filter((val) => val.id !== this.selectedEntryId));
+
+                // Insert to target
+                const targetDateEntries = this.allEntries[dateStr] || [];
+                this.$set(this.allEntries, dateStr, [...targetDateEntries, {...entry}]);
+
+                this.persist(dateStr);
+                this.persist(this.selectedDateStr);
+
+                // Close calendar picker if open
+                this.showMoveToDateCalendar = false;
+                this.selectedEntryId = false;
+
+                // Message
+                this.showSnackbar = true;
+                this.snackbarText = `Moved entry to ${moment(dateStr).format('ddd, MMM Do')}`;
+
+                console.log(`Move successful`);
+            },
+            selectNextDay() {
+              const newDate = moment(this.selectedDateStr).add(1, 'd');
+              this.selectedDateStr = newDate.format('YYYY-MM-DD');
+            },
+            selectPrevDay() {
+                const newDate = moment(this.selectedDateStr).subtract(1, 'd');
+                this.selectedDateStr = newDate.format('YYYY-MM-DD');
+            },
+            selectDay(dateStr) {
+                this.selectedDateStr = dateStr;
+                // close dialogs
+                this.showListView = false;
+                // Clear selections in case
+                this.selectedEntryId = false;
             },
             copyContent(event) {
                 event.target.select();
@@ -266,7 +354,7 @@
                     // Keep track of how many times this task has been delayed
                     const delayCount = entry.delayCount || 0;
                     // Clone entries to today's list
-                    newEntries.push({...entry, id: genId(), delayCount: delayCount + 1});
+                    newEntries.push({...entry, delayCount: delayCount + 1});
                     // Delete old
                     const filteredEntries = this.allEntries[dateStr].filter((val) => {
                         return val.id !== entry.id;
