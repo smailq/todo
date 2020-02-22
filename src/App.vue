@@ -63,10 +63,10 @@
         <v-content>
             <v-container fill-height class="align-content-start pt-0"
                          v-touch="{
-                    left: () => selectNextDay(),
-                    right: () => selectPrevDay(),
-                    up: () => switchMode(),
-                }"
+                            left: () => selectNextDay(),
+                            right: () => selectPrevDay(),
+                            up: () => switchMode(),
+                        }"
             >
                 <v-row class="ml-0">
                     <v-list dense class="flex-grow-1">
