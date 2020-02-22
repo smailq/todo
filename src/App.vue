@@ -9,7 +9,7 @@
                    @click="selectedEntryId = false">
                 <v-icon>mdi-close</v-icon>
             </v-btn>
-            <v-toolbar-title v-if="selectedEntryId === false" @click="selectedDateStr = todayStr">
+            <v-toolbar-title v-if="selectedEntryId === false" @click="titleClicked">
                 {{ appBarTitle }} <small v-if="appBarSubtitle !== ''">&middot; {{ appBarSubtitle }}</small>
             </v-toolbar-title>
             <v-spacer/>
@@ -18,7 +18,7 @@
                        @click="moveNotCompleted(notCompleted)">
                     <v-icon>mdi-application-import</v-icon>
                 </v-btn>
-                <v-btn icon @click="showListView = true">
+                <v-btn icon @click="listIconClicked">
                     <v-icon>mdi-format-list-bulleted</v-icon>
                 </v-btn>
             </div>
@@ -130,10 +130,10 @@
                         </v-btn>
                     </v-toolbar>
                     <v-list>
-                        <v-list-item @click="selectNote('New note')">
+                        <v-list-item v-for="noteName in allNotes" :key="noteName" @click="selectNote(noteName)">
                             <v-list-item-content>
                                 <v-list-item-title>
-                                    Note name 1
+                                    {{ noteName }}
                                 </v-list-item-title>
                             </v-list-item-content>
                         </v-list-item>
@@ -142,7 +142,7 @@
             </v-dialog>
             <v-dialog v-model="showListView" fullscreen hide-overlay transition="dialog-bottom-transition">
                 <v-card tile>
-                    <v-toolbar dark color="indigo" dense>
+                    <v-toolbar dark color="primary" dense>
                         <v-toolbar-title>
                             All Entries
                         </v-toolbar-title>
@@ -151,10 +151,9 @@
                             <v-icon>mdi-close</v-icon>
                         </v-btn>
                     </v-toolbar>
-                    <div v-if="datesMode">
                         <v-list v-for="dateStr in allDates" :key="dateStr">
                             <v-divider v-if="dateStr === todayStr"/>
-                            <v-subheader @click="selectDay(dateStr)" v-if="datesMode"
+                            <v-subheader @click="selectDay(dateStr)"
                                          :class="`darken-3 ${ dateStr > todayStr ? 'green--text' : ''} ${ dateStr === todayStr ? 'font-weight-bold' : ''}`">
                                 {{ dateStr | format_moment('ddd, MMM Do, YYYY')}}{{ dateStr === todayStr ? ' &middot; Today' : ''}}
                             </v-subheader>
@@ -179,16 +178,23 @@
                             </v-list-item>
                             <v-divider v-if="dateStr === todayStr"/>
                         </v-list>
+                </v-card>
+            </v-dialog>
+            <v-dialog v-model="showEditNote" persistent>
+                <v-card>
+                    <div class="pa-4">
+                        <v-text-field
+                            label="Title"
+                            v-model="editingNoteTitle"
+                            clearable
+                            autofocus
+                        />
                     </div>
-                    <div v-if="notesMode">
-                        <v-list>
-                            <v-list-item v-for="noteName in allNotes" :key="noteName">
-                                <v-list-item-title>
-                                    {{ noteName }}
-                                </v-list-item-title>
-                            </v-list-item>
-                        </v-list>
-                    </div>
+                    <v-card-actions>
+                        <v-spacer></v-spacer>
+                        <v-btn color="primary" @click="saveEditingNote">Save</v-btn>
+                        <v-btn text @click="cancelEditingNote">Cancel</v-btn>
+                    </v-card-actions>
                 </v-card>
             </v-dialog>
             <v-bottom-sheet v-if="datesMode" v-model="showMoveToDateCalendar">
@@ -228,8 +234,11 @@
             selectedEntryId: false,
             showListView: false,
             showMoveToDateCalendar: false,
+          showEditNote: false,
             moveToDateTargetStr: moment().format('YYYY-MM-DD'),
             showNoteSelectionView: false,
+          lastOpenedNote: '',
+          editingNoteTitle: '',
         }),
         mounted() {
             this.selectedDateStr = this.todayStr;
@@ -345,13 +354,82 @@
             'newEntry': 'newEntryUpdated',
         },
         methods: {
+            moveList(from, dest) {
+                // WARNING - IF dest EXISTS, IT WILL BE REPLACED.
+                // MAKE SURE THIS IS WHAT YOU WANT TO DO BEFORE CALLING THIS FUNC
+                console.debug(`Moving list ${from} to ${dest}`);
+
+                const tmp = this.allEntries[from];
+
+                if (typeof tmp === 'undefined' || !tmp.length) {
+                  console.debug(`Note ${from} does not exist, this is noop`);
+                  return;
+                }
+
+                this.$set(this.allEntries, dest, [...tmp]);
+                this.$delete(this.allEntries, from);
+                this.persist();
+            },
+            saveEditingNote() {
+
+                if (/^\d\d\d\d-\d\d-\d\d$/.test(this.editingNoteTitle)) {
+                  alert('Sorry, your new title looks like a date - this is not supported.');
+                  return;
+                }
+
+                if (this.editingNoteTitle === '') {
+                  alert('Sorry, title can not be empty.');
+                  return;
+                }
+
+                if (this.allEntries[this.editingNoteTitle] !== undefined) {
+                  alert('Sorry, the name already exists, this is not supported.');
+                  return;
+                }
+
+                this.moveList(this.selectedDateStr, this.editingNoteTitle);
+                this.selectedDateStr = this.editingNoteTitle;
+                this.lastOpenedNote = this.editingNoteTitle;
+                this.editingNoteTitle = '';
+                this.showEditNote = false;
+            },
+            cancelEditingNote() {
+                this.showEditNote = false;
+                this.editingNoteTitle = '';
+            },
+            listIconClicked() {
+                if (this.datesMode) {
+                    this.showListView = true;
+                } else if (this.notesMode) {
+                    this.showNoteSelectionView = true;
+                }
+            },
+            titleClicked() {
+                if (this.datesMode) {
+                    this.selectedDateStr = this.todayStr;
+                } else if (this.notesMode) {
+                      this.editingNoteTitle = this.selectedDateStr;
+                  this.showEditNote = true;
+                }
+            },
             selectNote(name) {
+                this.lastOpenedNote = name;
                 this.selectedDateStr = name;
                 this.showNoteSelectionView = false;
             },
             switchMode() {
                 if (/^\d\d\d\d-\d\d-\d\d$/.test(this.selectedDateStr)) {
-                    this.showNoteSelectionView = true;
+                  // If there are no notes, create one called 'Untitled' and open that
+                    if (this.allNotes.length < 1) {
+                      this.$set(this.allEntries,'Untitled', []);
+                      this.selectedDateStr = 'Untitled';
+                    } else if (this.lastOpenedNote !== '') {
+                      // Show last opened note
+                      this.selectedDateStr = this.lastOpenedNote;
+                    } else {
+                      // Show note list
+                      this.showNoteSelectionView = true;
+                    }
                 } else {
                     this.selectedDateStr = this.todayStr;
                 }
@@ -443,6 +521,20 @@
                     for (const [dateStr, entries] of Object.entries(this.allEntries)) {
                         myStorage.setItem(`TODO_${dateStr}`, JSON.stringify(entries));
                     }
+
+                    // Delete entires that does not exist
+                    const keys = Object.entries(myStorage);
+                    keys.forEach(([key,]) => {
+                        if (key.startsWith('TODO_')) {
+                          const listName = key.slice(5);
+                          if (typeof this.allEntries[listName] === 'undefined') {
+                            myStorage.removeItem(key);
+                          } else if (this.allEntries[listName].length && this.allEntries[listName].length < 1) {
+                            myStorage.removeItem(key);
+                          }
+                        }
+                    });
+
                 } else if (typeof dateStr === 'string' && dateStr.length > 0) {
                     myStorage.setItem(`TODO_${dateStr}`, JSON.stringify(this.allEntries[dateStr]));
                 }
