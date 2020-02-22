@@ -14,9 +14,12 @@
             </v-toolbar-title>
             <v-spacer/>
             <div v-if="selectedEntryId === false">
-                <v-btn icon v-if="notCompleted.length > 0 && selectedDateStr === todayStr"
+                <v-btn icon v-if="datesMode && notCompleted.length > 0 && selectedDateStr === todayStr"
                        @click="moveNotCompleted(notCompleted)">
                     <v-icon>mdi-application-import</v-icon>
+                </v-btn>
+                <v-btn icon v-if="notesMode" @click="showNewNote = true">
+                    <v-icon>mdi-playlist-plus</v-icon>
                 </v-btn>
                 <v-btn icon @click="listIconClicked">
                     <v-icon>mdi-format-list-bulleted</v-icon>
@@ -189,11 +192,31 @@
                             clearable
                             autofocus
                         />
+                        <v-btn small text color="warning" @click="deleteNote">
+                            Delete
+                        </v-btn>
                     </div>
                     <v-card-actions>
                         <v-spacer></v-spacer>
                         <v-btn color="primary" @click="saveEditingNote">Save</v-btn>
                         <v-btn text @click="cancelEditingNote">Cancel</v-btn>
+                    </v-card-actions>
+                </v-card>
+            </v-dialog>
+            <v-dialog v-model="showNewNote" persistent>
+                <v-card>
+                    <div class="pa-4">
+                        <v-text-field
+                                label="Title"
+                                v-model="newNoteTitle"
+                                clearable
+                                autofocus
+                        />
+                    </div>
+                    <v-card-actions>
+                        <v-spacer></v-spacer>
+                        <v-btn color="primary" @click="saveNewNote">Save</v-btn>
+                        <v-btn text @click="cancelNewNote">Cancel</v-btn>
                     </v-card-actions>
                 </v-card>
             </v-dialog>
@@ -228,17 +251,22 @@
         data: () => ({
             showSnackbar: false,
             snackbarText: '',
+
             newEntry: '',
             allEntries: {},
+
             selectedDateStr: '',
+            lastOpenedNote: '',
+            editingNoteTitle: '',
+            newNoteTitle: '',
+
             selectedEntryId: false,
             showListView: false,
             showMoveToDateCalendar: false,
-          showEditNote: false,
-            moveToDateTargetStr: moment().format('YYYY-MM-DD'),
+            showEditNote: false,
+            showNewNote: false,
             showNoteSelectionView: false,
-          lastOpenedNote: '',
-          editingNoteTitle: '',
+            moveToDateTargetStr: moment().format('YYYY-MM-DD'),
         }),
         mounted() {
             this.selectedDateStr = this.todayStr;
@@ -354,16 +382,71 @@
             'newEntry': 'newEntryUpdated',
         },
         methods: {
+            saveNewNote() {
+              const newTitle = typeof this.newNoteTitle === 'string' ? this.newNoteTitle.trim() : '';
+
+              if (/^\d\d\d\d-\d\d-\d\d$/.test(newTitle)) {
+                alert('Sorry, your new title looks like a date - this is not supported. Please choose other name.');
+                return;
+              }
+
+              if (newTitle.length < 1) {
+                alert('Sorry, title can not be empty.');
+                return;
+              }
+
+              if (this.allEntries[newTitle] !== undefined
+                  && this.allEntries[newTitle].length
+                  && this.allEntries[newTitle].length > 0) {
+                alert('Sorry, the name already exists, this is not supported.');
+                return;
+              }
+
+              this.$set(this.allEntries, newTitle, []);
+              this.persist(newTitle);
+
+              this.selectedDateStr = newTitle;
+              this.lastOpenedNote = newTitle;
+              this.newNoteTitle = '';
+              this.showNewNote= false;
+            },
+            cancelNewNote() {
+                this.newNoteTitle = '';
+                this.showNewNote = false;
+            },
+            deleteNote() {
+              const r = confirm(`Are you sure about deleting "${this.selectedDateStr}"? This can not be undone!`);
+              if (r !== true) {
+                return;
+              }
+
+              this.deleteList(this.selectedDateStr);
+              let existingNote = this.allNotes.length > 0 ? this.allNotes[0] : false;
+
+              if (existingNote === false) {
+                // No other existing note to open, create an untitled one. (without saving)
+                this.$set(this.allEntries,'Untitled', []);
+                existingNote = 'Untitled';
+              }
+
+              this.showEditNote = false;
+              this.selectedDateStr = 'Untitled';
+              this.lastOpenedNote = 'Untitled';
+
+            },
+            deleteList(name) {
+              this.$delete(this.allEntries, name);
+              this.persist();
+            },
             moveList(from, dest) {
                 // WARNING - IF dest EXISTS, IT WILL BE REPLACED.
                 // MAKE SURE THIS IS WHAT YOU WANT TO DO BEFORE CALLING THIS FUNC
                 console.debug(`Moving list ${from} to ${dest}`);
 
-                const tmp = this.allEntries[from];
+                let tmp = this.allEntries[from];
 
-                if (typeof tmp === 'undefined' || !tmp.length) {
-                  console.debug(`Note ${from} does not exist, this is noop`);
-                  return;
+                if (typeof tmp === 'undefined') {
+                  tmp = [];
                 }
 
                 this.$set(this.allEntries, dest, [...tmp]);
@@ -371,25 +454,28 @@
                 this.persist();
             },
             saveEditingNote() {
+              const newTitle = typeof this.editingNoteTitle === 'string' ? this.editingNoteTitle.trim() : '';
 
-                if (/^\d\d\d\d-\d\d-\d\d$/.test(this.editingNoteTitle)) {
+              if (/^\d\d\d\d-\d\d-\d\d$/.test(newTitle)) {
                   alert('Sorry, your new title looks like a date - this is not supported.');
                   return;
                 }
 
-                if (this.editingNoteTitle === '') {
+                if (newTitle.length < 1) {
                   alert('Sorry, title can not be empty.');
                   return;
                 }
 
-                if (this.allEntries[this.editingNoteTitle] !== undefined) {
+                if (this.allEntries[newTitle] !== undefined
+                    && this.allEntries[newTitle].length
+                    && this.allEntries[newTitle].length > 0) {
                   alert('Sorry, the name already exists, this is not supported.');
                   return;
                 }
 
-                this.moveList(this.selectedDateStr, this.editingNoteTitle);
-                this.selectedDateStr = this.editingNoteTitle;
-                this.lastOpenedNote = this.editingNoteTitle;
+                this.moveList(this.selectedDateStr, newTitle);
+                this.selectedDateStr = newTitle;
+                this.lastOpenedNote = newTitle;
                 this.editingNoteTitle = '';
                 this.showEditNote = false;
             },
@@ -423,6 +509,7 @@
                     if (this.allNotes.length < 1) {
                       this.$set(this.allEntries,'Untitled', []);
                       this.selectedDateStr = 'Untitled';
+                      this.lastOpenedNote = 'Untitled';
                     } else if (this.lastOpenedNote !== '') {
                       // Show last opened note
                       this.selectedDateStr = this.lastOpenedNote;
