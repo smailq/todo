@@ -76,9 +76,14 @@
                             <v-list-item-action class="mr-0" v-if="entry.isTodo">
                                 <v-checkbox v-model="entry.completed"/>
                             </v-list-item-action>
-                            <span v-else class="title pl-2 pr-2">
-                                    &middot;
-                                </span>
+                            <v-list-item-action v-else-if="entry.isLink" class="mr-0">
+                                <a :href="entry.text" target="_blank" style="text-decoration: none;">
+                                    <v-icon color="blue darken-2">mdi-link</v-icon>
+                                </a>
+                            </v-list-item-action>
+                            <v-list-item-action v-else class="mr-0">
+                                <v-icon>mdi-circle-small</v-icon>
+                            </v-list-item-action>
                             <v-textarea
                                     :class="`pr-1 ${entry.completed && 'completed'}`"
                                     v-model="entry.text"
@@ -671,6 +676,11 @@
                     createdAt: new Date(),
                     isTodo,
                 };
+
+                // See if this looks like a link
+                if (/^https?:\/\/[^\s$.?#].[^\s]*$/i.test(text)) {
+                    newEntryObj.isLink = true;
+                }
 
                 if (isTodo) {
                     newEntryObj.completed = false;
