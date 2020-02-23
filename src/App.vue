@@ -68,6 +68,14 @@
                             up: () => switchMode(),
                         }"
             >
+                <v-row v-if="notesMode && scheduledNotes[this.selectedDateStr]" class="ml-0">
+                    <v-col cols="12" class="pb-0">
+                        <v-alert type="info" :icon="false" dense max-width="" class="mb-0">
+                            Entries below will ba added <b>{{ scheduledNotes[this.selectedDateStr].frequency }}</b>
+                            on <b>{{ scheduledNotes[this.selectedDateStr].onDayOf }}</b> automatically.
+                        </v-alert>
+                    </v-col>
+                </v-row>
                 <v-row class="ml-0">
                     <v-list dense class="flex-grow-1">
                         <v-list-item v-for="(entry) in selectedEntries" :key="entry.id"
@@ -217,6 +225,21 @@
                                 clearable
                                 autofocus
                         />
+                        <v-form>
+                            <v-switch label="Repeat" v-model="newNoteRepeat" persistent-hint hint="All entries of the list will be added on a specific date repeatedly"></v-switch>
+                        <v-select class="mt-4"
+                                v-if="newNoteRepeat"
+                                v-model="newNoteRepeatFrequency"
+                                :items="['Weekly', 'Bi-weekly', 'Monthly', 'Quarterly', 'Bi-annually', 'Annually']"
+                                label="Repeat ..."
+                        ></v-select>
+                        <v-select
+                                v-if="newNoteRepeat"
+                                v-model="newNoteRepeatDayOf"
+                                :items="['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']"
+                                label="On ..."
+                        ></v-select>
+                        </v-form>
                     </div>
                     <v-card-actions>
                         <v-spacer></v-spacer>
@@ -259,11 +282,15 @@
 
             newEntry: '',
             allEntries: {},
+            scheduledNotes: {},
 
             selectedDateStr: '',
             lastOpenedNote: '',
             editingNoteTitle: '',
             newNoteTitle: '',
+            newNoteRepeat: false,
+            newNoteRepeatFrequency: '',
+            newNoteRepeatDayOf: '',
 
             selectedEntryId: false,
             showListView: false,
@@ -285,9 +312,12 @@
                 if (key.startsWith('TODO_')) {
                     this.$set(this.allEntries, key.slice(5), JSON.parse(value));
                 }
+                if (key.startsWith('REPEAT_')) {
+                    this.$set(this.scheduledNotes, key.slice(7), JSON.parse(value));
+                }
             });
 
-            console.debug('Finished loading from local storage');
+          console.debug('Finished loading from local storage');
         },
         computed: {
             datesMode() {
@@ -407,6 +437,16 @@
                 return;
               }
 
+              if (this.newNoteRepeat) {
+                // Add to scheduler
+                this.$set(this.scheduledNotes, newTitle, {
+                    frequency: this.newNoteRepeatFrequency,
+                    onDayOf: this.newNoteRepeatDayOf,
+                });
+
+                this.persistSchedules();
+              }
+
               this.$set(this.allEntries, newTitle, []);
               this.persist(newTitle);
 
@@ -414,6 +454,9 @@
               this.lastOpenedNote = newTitle;
               this.newNoteTitle = '';
               this.showNewNote= false;
+              this.newNoteRepeatFrequency = '';
+              this.newNoteRepeatDayOf = '';
+              this.newNoteRepeat = false;
             },
             cancelNewNote() {
                 this.newNoteTitle = '';
@@ -605,6 +648,26 @@
 
                 this.snackbarText = 'Moved unfinished todo to today';
                 this.showSnackbar = true;
+            },
+            persistSchedules() {
+              const myStorage = window.localStorage;
+
+                for (const [listName, obj] of Object.entries(this.scheduledNotes)) {
+                  myStorage.setItem(`REPEAT_${listName}`, JSON.stringify(obj));
+                }
+
+                // Delete entires that does not exist
+                const keys = Object.entries(myStorage);
+                keys.forEach(([key,]) => {
+                  if (key.startsWith('REPEAT_')) {
+                    const listName = key.slice(7);
+                    if (typeof this.scheduledNotes[listName] === 'undefined') {
+                      myStorage.removeItem(key);
+                    } else if (this.scheduledNotes[listName].length && this.scheduledNotes[listName].length < 1) {
+                      myStorage.removeItem(key);
+                    }
+                  }
+                });
             },
             persist(dateStr) {
                 const myStorage = window.localStorage;
