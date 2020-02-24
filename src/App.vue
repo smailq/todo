@@ -216,6 +216,7 @@
             <v-divider v-if="dateStr === todayStr"/>
             <v-subheader
                 @click="selectDay(dateStr)"
+                v-if="allEntries[dateStr] && allEntries[dateStr].length > 0"
                 :class="`darken-3 ${ dateStr > todayStr ? 'green--text' : ''} ${ dateStr === todayStr ? 'font-weight-bold' : ''}`"
             >
               {{ dateStr | format_moment('ddd, MMM Do, YYYY')}}{{ dateStr === todayStr ? ' &middot; Today'
@@ -504,9 +505,7 @@
         console.debug('Checking for rescheduling');
         for (const listName of Object.keys(this.scheduledNotes)) {
           const listData = { ...this.scheduledNotes[listName] };
-
-          if (listData.isAdded === false
-            && moment(listData.nextRepeatOn).isSameOrBefore(moment(), 'day')) {
+          if (moment(listData.nextRepeatOn).isSame(moment(), 'day')) {
             let nextDate = '';
             // Schedule next repeat if it's overdue
             switch (listData.frequency) {
@@ -537,28 +536,37 @@
             }
 
             // Add items to target date
-            const existingList = this.allEntries[nextDate] || [];
+            const existingList = this.allEntries[listData.nextRepeatOn] || [];
+
             const sourceList = this.allEntries[listName] || [];
+
+            if (sourceList.length < 1) {
+              // nothing to add, do nothing
+              return;
+            }
+
+            // Regenerate id when duplicating
             const updatedIdSourceList = sourceList.map((v) => {
               return { ...v, id: genId() };
             });
+
             // Assign new ids
             const mergedList = [ ...existingList, ...updatedIdSourceList ];
-            this.$set(this.allEntries, nextDate, mergedList);
+            this.$set(this.allEntries, listData.nextRepeatOn, mergedList);
+            this.persist(listData.nextRepeatOn);
+
+            console.debug(`Scheduler: Added to ${listData.nextRepeatOn} with `, sourceList);
 
             // Advance next date
             listData.nextRepeatOn = nextDate;
-            listData.isAdded = true;
             this.$set(this.scheduledNotes, listName, listData);
+            this.persistSchedules();
 
-            console.debug(`Scheduled ${nextDate} with `, mergedList);
-
-            this.persist(nextDate);
           }
         }
       },
       registerScheduler() {
-        //this.bgSchedulerTimerId = setInterval(this.scheduleRepeats, 10000);
+        this.bgSchedulerTimerId = setInterval(this.scheduleRepeats, 10000);
       },
       removeAutoRepeat() {
         // Add to scheduler
