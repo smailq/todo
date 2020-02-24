@@ -644,7 +644,9 @@
           return;
         }
 
+        this.removeAutoRepeat();
         this.deleteList(this.selectedDateStr);
+
         let existingNote = this.allNotes.length > 0 ? this.allNotes[0] : false;
 
         if (existingNote === false) {
@@ -654,8 +656,8 @@
         }
 
         this.showEditNote = false;
-        this.selectedDateStr = 'Untitled';
-        this.lastOpenedNote = 'Untitled';
+        this.selectedDateStr = existingNote;
+        this.lastOpenedNote = existingNote;
 
       },
       deleteList(name) {
