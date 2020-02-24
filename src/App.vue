@@ -21,7 +21,7 @@
         <small v-if="appBarSubtitle !== ''">&middot; {{ appBarSubtitle }}</small>
       </v-toolbar-title>
 
-      <v-menu bottom right v-if="datesMode && selectedEntryId !== false">
+      <v-menu bottom right v-if="selectedEntryId !== false">
         <template v-slot:activator="{ on }">
           <v-btn icon v-on="on">
             <v-icon>mdi-clock</v-icon>
@@ -105,9 +105,12 @@
                   rows="1"
                   @focus="selectedEntryId = entry.id"
               />
-              <small class="red--text">
+              <small class="red--text" v-if="entry.delayCount">
                 {{ entry.delayCount }}
               </small>
+              <v-icon small v-if="entry.isRepeating">
+                mdi-repeat
+              </v-icon>
             </v-list-item>
           </v-list>
         </v-row>
@@ -132,7 +135,7 @@
             />
           </v-list-item>
         </v-row>
-        <v-row class="justify-end" v-if="scheduledNotes[this.selectedDateStr] === undefined && notesMode">
+        <v-row class="justify-end" v-if="scheduledNotes[this.selectedDateStr] === undefined && notesMode && allEntries[this.selectedDateStr] && allEntries[this.selectedDateStr].length > 0">
           <v-btn
               small text class="mt-4"
               color="blue-grey darken-2"
@@ -325,7 +328,7 @@
           </v-card-actions>
         </v-card>
       </v-dialog>
-      <v-bottom-sheet v-if="datesMode" v-model="showMoveToDateCalendar">
+      <v-bottom-sheet v-model="showMoveToDateCalendar">
         <v-date-picker v-model="moveToDateTargetStr"/>
         <v-row justify="center">
           <v-btn class="ma-3" color="primary" @click="moveSelectedEntryTo(moveToDateTargetStr)">
@@ -360,6 +363,8 @@
       newEntry: '',
       allEntries: {},
       scheduledNotes: {},
+
+      lastOpenedListBeforeSwitch: '',
 
       selectedDateStr: '',
       lastOpenedNote: '',
@@ -547,7 +552,7 @@
 
             // Regenerate id when duplicating
             const updatedIdSourceList = sourceList.map((v) => {
-              return { ...v, id: genId() };
+              return { ...v, id: genId(), isRepeating: true };
             });
 
             // Assign new ids
@@ -738,23 +743,26 @@
         this.showNoteSelectionView = false;
       },
       switchMode() {
+        const prevList = `${this.lastOpenedListBeforeSwitch}`;
+        this.lastOpenedListBeforeSwitch = this.selectedDateStr;
+
         if (/^\d\d\d\d-\d\d-\d\d$/.test(this.selectedDateStr)) {
           // If there are no notes, create one called 'Untitled' and open that
           if (this.allNotes.length < 1) {
-            this.$set(this.allEntries, 'Untitled', []);
             this.selectedDateStr = 'Untitled';
-            this.lastOpenedNote = 'Untitled';
-          } else if (this.lastOpenedNote !== '') {
+          } else if (prevList !== '') {
             // Show last opened note
-            this.selectedDateStr = this.lastOpenedNote;
+            this.selectedDateStr = prevList;
           } else {
             // Show first note
-            const openingTitle = this.allNotes[0];
-            this.selectedDateStr = openingTitle;
-            this.lastOpenedNote = openingTitle;
+            this.selectedDateStr = this.allNotes[0];
           }
         } else {
-          this.selectedDateStr = this.todayStr;
+          if (prevList !== '') {
+            this.selectedDateStr = prevList;
+          } else {
+            this.selectedDateStr = this.todayStr;
+          }
         }
       },
       moveSelectedEntryTo(dateStr) {
