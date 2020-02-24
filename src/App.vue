@@ -135,7 +135,7 @@
             />
           </v-list-item>
         </v-row>
-        <v-row class="justify-end" v-if="scheduledNotes[this.selectedDateStr] === undefined && notesMode && allEntries[this.selectedDateStr] && allEntries[this.selectedDateStr].length > 0">
+        <v-row class="justify-end ml-0" v-if="scheduledNotes[this.selectedDateStr] === undefined && notesMode && allEntries[this.selectedDateStr] && allEntries[this.selectedDateStr].length > 0">
           <v-btn
               small text class="mt-4"
               color="blue-grey darken-2"
