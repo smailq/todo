@@ -295,6 +295,7 @@
             </p>
             <v-form>
               <v-select
+                  prepend-icon="mdi-repeat"
                   class="mt-4"
                   v-model="newNoteRepeatFrequency"
                   :items="['Daily', 'Weekly', 'Bi-weekly', 'Monthly', 'Quarterly', 'Bi-annually', 'Annually']"
@@ -367,7 +368,6 @@
       lastOpenedListBeforeSwitch: '',
 
       selectedDateStr: '',
-      lastOpenedNote: '',
       editingNoteTitle: '',
       newNoteTitle: '',
       newNoteRepeat: false,
@@ -642,7 +642,6 @@
         this.persist(newTitle);
 
         this.selectedDateStr = newTitle;
-        this.lastOpenedNote = newTitle;
         this.newNoteTitle = '';
         this.showNewNote = false;
         this.showNoteSelectionView = false;
@@ -670,7 +669,6 @@
 
         this.showEditNote = false;
         this.selectedDateStr = existingNote;
-        this.lastOpenedNote = existingNote;
 
       },
       deleteList(name) {
@@ -714,7 +712,6 @@
 
         this.moveList(this.selectedDateStr, newTitle);
         this.selectedDateStr = newTitle;
-        this.lastOpenedNote = newTitle;
         this.editingNoteTitle = '';
         this.showEditNote = false;
       },
@@ -738,7 +735,6 @@
         }
       },
       selectNote(name) {
-        this.lastOpenedNote = name;
         this.selectedDateStr = name;
         this.showNoteSelectionView = false;
       },
