@@ -138,7 +138,20 @@
             </v-alert>
           </v-col>
         </v-row>
-
+        <v-btn
+            v-if="activeFab !== false"
+            :key="activeFab.icon"
+            :color="activeFab.color"
+            absolute
+            fab
+            dark
+            bottom
+            class="mb-4"
+            right
+            @click="switchMode()"
+        >
+          <v-icon>{{ activeFab.icon }}</v-icon>
+        </v-btn>
       </v-container>
       <v-dialog v-model="showNoteSelectionView"
                 fullscreen
@@ -283,6 +296,7 @@
           </v-btn>
         </v-row>
       </v-bottom-sheet>
+
     </v-content>
     <v-snackbar
         v-model="showSnackbar"
@@ -291,20 +305,7 @@
         color="info">
       {{ snackbarText }}
     </v-snackbar>
-    <v-fab-transition>
-      <v-btn
-          v-if="activeFab !== false"
-          :key="activeFab.icon"
-          :color="activeFab.color"
-          fab
-          dark
-          bottom
-          @click="switchMode()"
-          class="ma-2"
-      >
-        <v-icon>{{ activeFab.icon }}</v-icon>
-      </v-btn>
-    </v-fab-transition>
+
   </v-app>
 </template>
 
