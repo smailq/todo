@@ -162,7 +162,7 @@
           <v-card-actions class="justify-space-between">
             <v-btn small text @click="editAutoRepeat()">Edit</v-btn>
             <v-btn small text @click="removeAutoRepeat()">
-              Remove
+              Disable
             </v-btn>
           </v-card-actions>
         </v-card>
