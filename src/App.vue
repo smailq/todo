@@ -4,14 +4,18 @@
         app
         :color="selectedEntryId === false ? (notesMode ? 'light-green' : 'primary') : 'blue-grey'"
         dark
-        dense>
+        dense
+    >
+
       <v-btn icon
              v-if="selectedEntryId !== false"
              @click="selectedEntryId = false">
         <v-icon>mdi-close</v-icon>
       </v-btn>
       <v-toolbar-title v-if="selectedEntryId === false" @click="titleClicked">
-        {{ appBarTitle }} <small v-if="appBarSubtitle !== ''">&middot; {{ appBarSubtitle }}</small>
+        {{ appBarTitle }}
+        <small v-if="appBarSubtitle !== ''">&middot; {{ appBarSubtitle }}</small>
+        <v-icon small v-if="notesMode && scheduledNotes[selectedDateStr]" class="ml-2">mdi-repeat</v-icon>
       </v-toolbar-title>
       <v-spacer/>
       <div v-if="selectedEntryId === false">
@@ -70,14 +74,6 @@
                      up: () => switchMode(),
                    }"
       >
-        <v-row v-if="notesMode && scheduledNotes[this.selectedDateStr]" class="ml-0">
-          <v-col cols="12" class="pb-0">
-            <v-alert type="info" :icon="false" dense max-width="" class="mb-0">
-              Entries below will ba added <b>{{ scheduledNotes[this.selectedDateStr].frequency }}</b>
-              on <b>{{ scheduledNotes[this.selectedDateStr].onDayOf }}</b> automatically.
-            </v-alert>
-          </v-col>
-        </v-row>
         <v-row class="ml-0">
           <v-list dense class="flex-grow-1">
             <v-list-item v-for="(entry) in selectedEntries" :key="entry.id"
@@ -134,12 +130,20 @@
             />
           </v-list-item>
         </v-row>
+        <v-row v-if="notesMode && scheduledNotes[this.selectedDateStr]" class="ml-0">
+          <v-col cols="12" class="pb-0">
+            <v-alert type="info" :icon="false" dense max-width="" class="mb-0">
+              All above entries will be added
+              <b>{{ scheduledNotes[this.selectedDateStr].frequency }}</b>.
+              Next scheduled date is <b>{{ scheduledNotes[this.selectedDateStr].nextRepeatOn }}</b>.
+            </v-alert>
+          </v-col>
+        </v-row>
       </v-container>
-
       <v-dialog v-model="showNoteSelectionView"
-								fullscreen
-								hide-overlay
-								transition="dialog-bottom-transition">
+                fullscreen
+                hide-overlay
+                transition="dialog-bottom-transition">
         <v-card tile>
           <v-toolbar dark color="light-green" dense>
             <v-toolbar-title>
@@ -155,6 +159,7 @@
               <v-list-item-content>
                 <v-list-item-title>
                   {{ noteName }}
+                  <v-icon small v-if="scheduledNotes[noteName]" class="ml-2">mdi-repeat</v-icon>
                 </v-list-item-title>
               </v-list-item-content>
             </v-list-item>
@@ -175,9 +180,9 @@
           <v-list v-for="dateStr in allDates" :key="dateStr">
             <v-divider v-if="dateStr === todayStr"/>
             <v-subheader
-								@click="selectDay(dateStr)"
-								:class="`darken-3 ${ dateStr > todayStr ? 'green--text' : ''} ${ dateStr === todayStr ? 'font-weight-bold' : ''}`"
-						>
+                @click="selectDay(dateStr)"
+                :class="`darken-3 ${ dateStr > todayStr ? 'green--text' : ''} ${ dateStr === todayStr ? 'font-weight-bold' : ''}`"
+            >
               {{ dateStr | format_moment('ddd, MMM Do, YYYY')}}{{ dateStr === todayStr ? ' &middot; Today' : ''}}
             </v-subheader>
             <v-list-item v-for="entry in allEntries[dateStr]" :key="entry.id">
@@ -238,15 +243,28 @@
               <v-select class="mt-4"
                         v-if="newNoteRepeat"
                         v-model="newNoteRepeatFrequency"
-                        :items="['Weekly', 'Bi-weekly', 'Monthly', 'Quarterly', 'Bi-annually', 'Annually']"
+                        :items="['Daily', 'Weekly', 'Bi-weekly', 'Monthly', 'Quarterly', 'Bi-annually', 'Annually']"
                         label="Repeat ..."
               />
-              <v-select
-                  v-if="newNoteRepeat"
-                  v-model="newNoteRepeatDayOf"
-                  :items="['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']"
-                  label="On ..."
-              />
+              <v-menu v-if="newNoteRepeat"
+                      v-model="showNewNoteDatePicker"
+                      :close-on-content-click="false"
+                      :nudge-right="40"
+                      transition="scale-transition"
+                      offset-y
+                      min-width="290px"
+              >
+                <template v-slot:activator="{ on }">
+                  <v-text-field
+                      v-model="newNoteRepeatFrom"
+                      label="Starting ..."
+                      prepend-icon="mdi-calendar"
+                      readonly
+                      v-on="on"
+                  />
+                </template>
+                <v-date-picker v-model="newNoteRepeatFrom" @input="showNewNoteDatePicker = false"/>
+              </v-menu>
             </v-form>
           </div>
           <v-card-actions>
@@ -298,7 +316,10 @@
       newNoteTitle: '',
       newNoteRepeat: false,
       newNoteRepeatFrequency: '',
-      newNoteRepeatDayOf: '',
+      showNewNoteDatePicker: false,
+      newNoteRepeatFrom: '',
+
+      bgSchedulerTimerId: null,
 
       selectedEntryId: false,
       showListView: false,
@@ -308,6 +329,12 @@
       showNoteSelectionView: false,
       moveToDateTargetStr: moment().format('YYYY-MM-DD'),
     }),
+    beforeDestroy() {
+      clearInterval(this.bgSchedulerTimerId);
+    },
+    created() {
+      this.registerScheduler();
+    },
     mounted() {
       this.selectedDateStr = this.todayStr;
 
@@ -425,6 +452,73 @@
       'newEntry': 'newEntryUpdated',
     },
     methods: {
+      scheduleRepeats() {
+        console.debug('Checking for rescheduling');
+        for (const listName of Object.keys(this.scheduledNotes)) {
+          const listData = { ...this.scheduledNotes[listName] };
+
+          if (listData.isAdded === false
+              && moment(listData.nextRepeatOn).isSameOrBefore(moment(), 'day')) {
+            let nextDate = '';
+            // Schedule next repeat if it's overdue
+            switch (listData.frequency) {
+              case 'Daily':
+                nextDate = moment(listData.nextRepeatOn).add(1, 'days')
+                                                        .format('YYYY-MM-DD');
+                break;
+              case 'Weekly':
+                nextDate = moment(listData.nextRepeatOn).add(1, 'weeks')
+                                                        .format('YYYY-MM-DD');
+                break;
+              case 'Bi-weekly':
+                nextDate = moment(listData.nextRepeatOn).add(2, 'weeks')
+                                                        .format('YYYY-MM-DD');
+                break;
+              case 'Monthly':
+                nextDate = moment(listData.nextRepeatOn).add(1, 'months')
+                                                        .format('YYYY-MM-DD');
+                break;
+              case 'Quarterly':
+                nextDate = moment(listData.nextRepeatOn).add(1, 'quarters')
+                                                        .format('YYYY-MM-DD');
+                break;
+              case 'Bi-annually':
+                nextDate = moment(listData.nextRepeatOn).add(6, 'months')
+                                                        .format('YYYY-MM-DD');
+                break;
+              case 'Annually':
+                nextDate = moment(listData.nextRepeatOn).add(1, 'years')
+                                                        .format('YYYY-MM-DD');
+                break;
+              default:
+                console.error('Unknown frequency');
+                return;
+            }
+
+            // Add items to target date
+            const existingList = this.allEntries[nextDate] || [];
+            const sourceList = this.allEntries[listName] || [];
+            const updatedIdSourceList = sourceList.map((v) => {
+                return {...v, id:genId()};
+            });
+            // Assign new ids
+            const mergedList = [ ...existingList, ...updatedIdSourceList ];
+            this.$set(this.allEntries, nextDate, mergedList);
+
+            // Advance next date
+            listData.nextRepeatOn = nextDate;
+            listData.isAdded = true;
+            this.$set(this.scheduledNotes, listName, listData);
+
+            console.debug(`Scheduled ${nextDate} with `, mergedList);
+
+            this.persist(nextDate);
+          }
+        }
+      },
+      registerScheduler() {
+        this.bgSchedulerTimerId = setInterval(this.scheduleRepeats, 10000);
+      },
       saveNewNote() {
         const newTitle = typeof this.newNoteTitle === 'string' ? this.newNoteTitle.trim() : '';
 
@@ -451,15 +545,21 @@
             alert('Please select frequency');
             return;
           }
-
-          if (this.newNoteRepeatDayOf.length < 1) {
-            alert('Please select which day to schedule');
+          if (this.newNoteRepeatFrom.length < 1) {
+            alert('Please select a date');
+            return;
+          } else if (moment(this.newNoteRepeatFrom).isBefore(moment(), 'day')) {
+            alert('Cannot schedule it in the past');
             return;
           }
+
+          const nextDate = this.newNoteRepeatFrom;
+
           // Add to scheduler
           this.$set(this.scheduledNotes, newTitle, {
             frequency: this.newNoteRepeatFrequency,
-            onDayOf: this.newNoteRepeatDayOf,
+            nextRepeatOn: nextDate,
+            isAdded: false,
           });
 
           this.persistSchedules();
@@ -473,10 +573,13 @@
         this.newNoteTitle = '';
         this.showNewNote = false;
         this.newNoteRepeatFrequency = '';
-        this.newNoteRepeatDayOf = '';
+        this.newNoteRepeatFrom = '';
         this.newNoteRepeat = false;
       },
       cancelNewNote() {
+        this.newNoteRepeat = false;
+        this.newNoteRepeatFrequency = '';
+        this.newNoteRepeatFrom = '';
         this.newNoteTitle = '';
         this.showNewNote = false;
       },
@@ -783,8 +886,10 @@
         // Save entry
         this.persist(this.selectedDateStr);
       },
-    },
-  };
+    }
+    ,
+  }
+  ;
 </script>
 <style>
   .v-textarea.completed textarea {
