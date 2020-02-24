@@ -2,70 +2,73 @@
   <v-app>
     <v-app-bar
         app
-        :color="selectedEntryId === false ? (notesMode ? 'light-green' : 'primary') : 'blue-grey'"
+        :color="selectedEntryId === false ? (notesMode ? 'green' : 'primary') : 'blue-grey'"
         dark
         dense
     >
+      <v-btn icon
+             v-if="selectedEntryId === false && datesMode"
+             @click="switchMode()">
+        <v-icon>mdi-calendar</v-icon>
+      </v-btn>
+      <v-btn icon
+             v-if="selectedEntryId === false && notesMode"
+             @click="switchMode()">
+        <v-icon>mdi-file-document-outline</v-icon>
+      </v-btn>
+      <v-toolbar-title class="pl-0" v-if="selectedEntryId === false" @click="titleClicked">
+        {{ appBarTitle }}
+        <small v-if="appBarSubtitle !== ''">&middot; {{ appBarSubtitle }}</small>
+      </v-toolbar-title>
+
+      <v-menu bottom right v-if="datesMode && selectedEntryId !== false">
+        <template v-slot:activator="{ on }">
+          <v-btn icon v-on="on">
+            <v-icon>mdi-clock</v-icon>
+          </v-btn>
+        </template>
+        <v-list>
+          <v-list-item two-line v-if="nextMondayStr !== ''" @click="moveSelectedEntryTo(nextMondayStr)">
+            <v-list-item-content>
+              <v-list-item-title>Next week</v-list-item-title>
+              <v-list-item-subtitle>{{ nextMondayStr | format_moment('ddd, MMM Do') }}
+              </v-list-item-subtitle>
+            </v-list-item-content>
+          </v-list-item>
+          <v-list-item v-if="nextSaturdayStr !== ''" @click="moveSelectedEntryTo(nextSaturdayStr)">
+            <v-list-item-content>
+              <v-list-item-title>Next weekend</v-list-item-title>
+              <v-list-item-subtitle>{{ nextSaturdayStr | format_moment('ddd, MMM Do') }}
+              </v-list-item-subtitle>
+            </v-list-item-content>
+          </v-list-item>
+          <v-list-item @click="showMoveToDateCalendar = true">
+            <v-list-item-content>
+              <v-list-item-title>Select date</v-list-item-title>
+            </v-list-item-content>
+          </v-list-item>
+        </v-list>
+      </v-menu>
+      <v-btn icon @click="deleteSelectedEntry()" v-if="selectedEntryId !== false">
+        <v-icon>mdi-delete-outline</v-icon>
+      </v-btn>
+
+      <v-spacer/>
 
       <v-btn icon
              v-if="selectedEntryId !== false"
              @click="selectedEntryId = false">
         <v-icon>mdi-close</v-icon>
       </v-btn>
-      <v-toolbar-title v-if="selectedEntryId === false" @click="titleClicked">
-        {{ appBarTitle }}
-        <small v-if="appBarSubtitle !== ''">&middot; {{ appBarSubtitle }}</small>
-        <v-icon small v-if="notesMode && scheduledNotes[selectedDateStr]" class="ml-2">mdi-repeat</v-icon>
-      </v-toolbar-title>
-      <v-spacer/>
-      <div v-if="selectedEntryId === false">
-        <v-btn icon
-               v-if="datesMode && notCompleted.length > 0 && selectedDateStr === todayStr"
-               @click="moveNotCompleted(notCompleted)">
-          <v-icon>mdi-application-import</v-icon>
-        </v-btn>
-        <v-btn icon v-if="notesMode" @click="showNewNote = true">
-          <v-icon>mdi-playlist-plus</v-icon>
-        </v-btn>
-        <v-btn icon @click="listIconClicked">
-          <v-icon>mdi-format-list-bulleted</v-icon>
-        </v-btn>
-      </div>
-      <div v-else>
-        <v-menu bottom left v-if="datesMode">
-          <template v-slot:activator="{ on }">
-            <v-btn icon v-on="on">
-              <v-icon>mdi-clock</v-icon>
-            </v-btn>
-          </template>
-          <v-list>
-            <v-list-item two-line v-if="nextMondayStr !== ''" @click="moveSelectedEntryTo(nextMondayStr)">
-              <v-list-item-content>
-                <v-list-item-title>Next week</v-list-item-title>
-                <v-list-item-subtitle>{{ nextMondayStr | format_moment('ddd, MMM Do') }}
-                </v-list-item-subtitle>
-              </v-list-item-content>
-            </v-list-item>
-            <v-list-item v-if="nextSaturdayStr !== ''" @click="moveSelectedEntryTo(nextSaturdayStr)">
-              <v-list-item-content>
-                <v-list-item-title>Next weekend</v-list-item-title>
-                <v-list-item-subtitle>{{ nextSaturdayStr | format_moment('ddd, MMM Do') }}
-                </v-list-item-subtitle>
-              </v-list-item-content>
-            </v-list-item>
-            <v-list-item @click="showMoveToDateCalendar = true">
-              <v-list-item-content>
-                <v-list-item-title>Select date</v-list-item-title>
-              </v-list-item-content>
-            </v-list-item>
-          </v-list>
-        </v-menu>
-        <v-btn icon @click="deleteSelectedEntry()">
-          <v-icon>mdi-delete-outline</v-icon>
-        </v-btn>
-      </div>
+      <v-btn icon
+             v-if="selectedEntryId === false && datesMode && notCompleted.length > 0 && selectedDateStr === todayStr"
+             @click="moveNotCompleted(notCompleted)">
+        <v-icon>mdi-application-import</v-icon>
+      </v-btn>
+      <v-btn icon @click="listIconClicked" v-if="selectedEntryId === false">
+        <v-icon>mdi-view-headline</v-icon>
+      </v-btn>
     </v-app-bar>
-
     <v-content>
       <v-container fill-height class="align-content-start pt-0"
                    v-touch="{
@@ -123,48 +126,67 @@
                 dense
                 hide-details
                 rows="1"
-                placeholder="New ... (start with a space for todo)"
+                placeholder="Type new entry here"
                 class="font-italic"
                 @focus="selectedEntryId = false"
             />
           </v-list-item>
         </v-row>
-        <v-row v-if="notesMode && scheduledNotes[this.selectedDateStr]" class="ml-0">
-          <v-col cols="12" class="pb-0">
-            <v-alert type="info" :icon="false" dense max-width="" class="mb-0">
-              All above entries will be added
-              <b>{{ scheduledNotes[this.selectedDateStr].frequency }}</b>.
-              Next scheduled date is <b>{{ scheduledNotes[this.selectedDateStr].nextRepeatOn }}</b>.
-            </v-alert>
-          </v-col>
+        <v-row class="justify-end" v-if="scheduledNotes[this.selectedDateStr] === undefined && notesMode">
+          <v-btn
+              small text class="mt-4"
+              color="blue-grey darken-2"
+              @click="showAutoRepeatDialog = true"
+          >
+            Enable auto repeat
+          </v-btn>
         </v-row>
-        <v-btn
-            v-if="activeFab !== false"
-            :key="activeFab.icon"
-            :color="activeFab.color"
-            absolute
-            fab
+        <v-card
+            class="mt-4"
+            color="blue-grey"
             dark
-            bottom
-            class="mb-4"
-            right
-            @click="switchMode()"
+            v-if="notesMode && scheduledNotes[this.selectedDateStr]"
         >
-          <v-icon>{{ activeFab.icon }}</v-icon>
-        </v-btn>
+          <v-list-item three-line>
+            <v-list-item-content>
+              <v-list-item-title><b>Auto Repeat {{ scheduledNotes[this.selectedDateStr].frequency }}</b>
+              </v-list-item-title>
+              <v-list-item-subtitle class="white--text">All entries in this note will be added to the calendar on <b>{{
+                scheduledNotes[this.selectedDateStr].nextRepeatOn }}</b>.
+              </v-list-item-subtitle>
+            </v-list-item-content>
+          </v-list-item>
+          <v-card-actions class="justify-space-between">
+            <v-btn small text @click="editAutoRepeat()">Edit</v-btn>
+            <v-btn small text @click="removeAutoRepeat()">
+              Remove
+            </v-btn>
+          </v-card-actions>
+        </v-card>
       </v-container>
       <v-dialog v-model="showNoteSelectionView"
                 fullscreen
                 hide-overlay
                 transition="dialog-bottom-transition">
         <v-card tile>
-          <v-toolbar dark color="light-green" dense>
+          <v-toolbar dark color="green" dense>
             <v-toolbar-title>
               All Notes
             </v-toolbar-title>
             <v-spacer/>
             <v-btn icon dark @click="showNoteSelectionView = false">
               <v-icon>mdi-close</v-icon>
+            </v-btn>
+            <v-btn
+                fab
+                color="pink"
+                :style="{left: '50%', transform:'translateX(-50%)'}"
+                bottom
+                absolute
+                small
+                @click="showNewNote = true"
+            >
+              <v-icon>mdi-plus</v-icon>
             </v-btn>
           </v-toolbar>
           <v-list>
@@ -183,7 +205,7 @@
         <v-card tile>
           <v-toolbar dark color="primary" dense>
             <v-toolbar-title>
-              All Entries
+              All Dates
             </v-toolbar-title>
             <v-spacer/>
             <v-btn icon dark @click="showListView = false">
@@ -244,6 +266,7 @@
       </v-dialog>
       <v-dialog v-model="showNewNote" persistent>
         <v-card>
+          <v-card-title>Create new note</v-card-title>
           <div class="pa-4">
             <v-text-field
                 label="Title"
@@ -251,22 +274,35 @@
                 clearable
                 autofocus
             />
+          </div>
+          <v-card-actions>
+            <v-spacer/>
+            <v-btn color="primary" @click="saveNewNote">Save</v-btn>
+            <v-btn text @click="cancelNewNote">Cancel</v-btn>
+          </v-card-actions>
+        </v-card>
+      </v-dialog>
+      <v-dialog v-model="showAutoRepeatDialog" persistent>
+        <v-card>
+          <v-card-title>Enable auto repeat</v-card-title>
+          <div class="pa-4">
+            <p>
+              All entries in this note will be added to the calendar date on specified date.
+            </p>
             <v-form>
-              <v-switch label="Repeat" v-model="newNoteRepeat" persistent-hint
-                        hint="All entries of the list will be added on a specific date repeatedly"/>
-              <v-select class="mt-4"
-                        v-if="newNoteRepeat"
-                        v-model="newNoteRepeatFrequency"
-                        :items="['Daily', 'Weekly', 'Bi-weekly', 'Monthly', 'Quarterly', 'Bi-annually', 'Annually']"
-                        label="Repeat ..."
+              <v-select
+                  class="mt-4"
+                  v-model="newNoteRepeatFrequency"
+                  :items="['Daily', 'Weekly', 'Bi-weekly', 'Monthly', 'Quarterly', 'Bi-annually', 'Annually']"
+                  label="Repeat ..."
               />
-              <v-menu v-if="newNoteRepeat"
-                      v-model="showNewNoteDatePicker"
-                      :close-on-content-click="false"
-                      :nudge-right="40"
-                      transition="scale-transition"
-                      offset-y
-                      min-width="290px"
+              <v-menu
+                  v-model="showNewNoteDatePicker"
+                  :close-on-content-click="false"
+                  :nudge-right="40"
+                  transition="scale-transition"
+                  offset-y
+                  min-width="290px"
               >
                 <template v-slot:activator="{ on }">
                   <v-text-field
@@ -283,8 +319,8 @@
           </div>
           <v-card-actions>
             <v-spacer/>
-            <v-btn color="primary" @click="saveNewNote">Save</v-btn>
-            <v-btn text @click="cancelNewNote">Cancel</v-btn>
+            <v-btn color="primary" @click="saveAutoRepeat">Save</v-btn>
+            <v-btn text @click="cancelAutoRepeat">Cancel</v-btn>
           </v-card-actions>
         </v-card>
       </v-dialog>
@@ -296,7 +332,6 @@
           </v-btn>
         </v-row>
       </v-bottom-sheet>
-
     </v-content>
     <v-snackbar
         v-model="showSnackbar"
@@ -305,7 +340,6 @@
         color="info">
       {{ snackbarText }}
     </v-snackbar>
-
   </v-app>
 </template>
 
@@ -337,6 +371,7 @@
 
       bgSchedulerTimerId: null,
 
+      showAutoRepeatDialog: false,
       selectedEntryId: false,
       showListView: false,
       showMoveToDateCalendar: false,
@@ -359,7 +394,7 @@
       const myStorage = window.localStorage;
       const keys = Object.entries(myStorage);
 
-      keys.forEach(([key, value]) => {
+      keys.forEach(([ key, value ]) => {
         if (key.startsWith('TODO_')) {
           this.$set(this.allEntries, key.slice(5), JSON.parse(value));
         }
@@ -371,15 +406,6 @@
       console.debug('Finished loading from local storage');
     },
     computed: {
-      activeFab() {
-        if (this.datesMode) {
-          return {color: 'light-green', icon: 'mdi-file-document-outline'};
-        }
-        if (this.notesMode) {
-          return {color: 'primary', icon: 'mdi-calendar'};
-        }
-        return false;
-      },
       datesMode() {
         return /^\d\d\d\d-\d\d-\d\d$/.test(this.selectedDateStr);
       },
@@ -404,7 +430,7 @@
         console.debug('Update notCompleted items from past');
         const notCompleted = [];
         // Search for all to do items that hasn't been completed in the past
-        for (const [dateStr, entries] of Object.entries(this.allEntries)) {
+        for (const [ dateStr, entries ] of Object.entries(this.allEntries)) {
           if (!(/^\d\d\d\d-\d\d-\d\d$/.test(dateStr))) {
             continue; // If the entry is not a date, don't count
           }
@@ -414,7 +440,7 @@
           }
           for (const entry of entries) {
             if (entry.isTodo && !entry.completed) {
-              notCompleted.push({dateStr, entry});
+              notCompleted.push({ dateStr, entry });
             }
           }
         }
@@ -458,7 +484,7 @@
       },
       appBarSubtitle() {
         if (/^\d\d\d\d-\d\d-\d\d$/.test(this.selectedDateStr)) {
-          return moment(this.selectedDateStr).format('ddd, MMM Do');
+          return moment(this.selectedDateStr).format('ddd, MMM D');
         }
 
         return '';
@@ -477,10 +503,10 @@
       scheduleRepeats() {
         console.debug('Checking for rescheduling');
         for (const listName of Object.keys(this.scheduledNotes)) {
-          const listData = {...this.scheduledNotes[listName]};
+          const listData = { ...this.scheduledNotes[listName] };
 
           if (listData.isAdded === false
-              && moment(listData.nextRepeatOn).isSameOrBefore(moment(), 'day')) {
+            && moment(listData.nextRepeatOn).isSameOrBefore(moment(), 'day')) {
             let nextDate = '';
             // Schedule next repeat if it's overdue
             switch (listData.frequency) {
@@ -514,10 +540,10 @@
             const existingList = this.allEntries[nextDate] || [];
             const sourceList = this.allEntries[listName] || [];
             const updatedIdSourceList = sourceList.map((v) => {
-              return {...v, id: genId()};
+              return { ...v, id: genId() };
             });
             // Assign new ids
-            const mergedList = [...existingList, ...updatedIdSourceList];
+            const mergedList = [ ...existingList, ...updatedIdSourceList ];
             this.$set(this.allEntries, nextDate, mergedList);
 
             // Advance next date
@@ -534,6 +560,51 @@
       registerScheduler() {
         //this.bgSchedulerTimerId = setInterval(this.scheduleRepeats, 10000);
       },
+      removeAutoRepeat() {
+        // Add to scheduler
+        this.$delete(this.scheduledNotes, this.selectedDateStr);
+        this.persistSchedules();
+        this.cancelAutoRepeat();
+      },
+      editAutoRepeat() {
+        if (this.scheduledNotes[this.selectedDateStr] === undefined) {
+          console.debug('Trying to edit non-existing scheduled repeat, this is noop.');
+          return;
+        }
+        this.newNoteRepeatFrequency = this.scheduledNotes[this.selectedDateStr].frequency;
+        this.newNoteRepeatFrom = this.scheduledNotes[this.selectedDateStr].nextRepeatOn;
+        this.showAutoRepeatDialog = true;
+      },
+      saveAutoRepeat() {
+
+        if (this.newNoteRepeatFrequency.length < 1) {
+          alert('Please select frequency');
+          return;
+        }
+        if (this.newNoteRepeatFrom.length < 1) {
+          alert('Please select a date');
+          return;
+        } else if (moment(this.newNoteRepeatFrom).isBefore(moment(), 'day')) {
+          alert('Cannot schedule it in the past');
+          return;
+        }
+
+        const nextDate = this.newNoteRepeatFrom;
+
+        // Add to scheduler
+        this.$set(this.scheduledNotes, this.selectedDateStr, {
+          frequency: this.newNoteRepeatFrequency,
+          nextRepeatOn: nextDate,
+        });
+
+        this.persistSchedules();
+        this.cancelAutoRepeat();
+      },
+      cancelAutoRepeat() {
+        this.newNoteRepeatFrequency = '';
+        this.newNoteRepeatFrom = '';
+        this.showAutoRepeatDialog = false;
+      },
       saveNewNote() {
         const newTitle = typeof this.newNoteTitle === 'string' ? this.newNoteTitle.trim() : '';
 
@@ -548,35 +619,10 @@
         }
 
         if (this.allEntries[newTitle] !== undefined
-            && this.allEntries[newTitle].length
-            && this.allEntries[newTitle].length > 0) {
+          && this.allEntries[newTitle].length
+          && this.allEntries[newTitle].length > 0) {
           alert('Sorry, the name already exists, this is not supported.');
           return;
-        }
-
-        if (this.newNoteRepeat) {
-          if (this.newNoteRepeatFrequency.length < 1) {
-            alert('Please select frequency');
-            return;
-          }
-          if (this.newNoteRepeatFrom.length < 1) {
-            alert('Please select a date');
-            return;
-          } else if (moment(this.newNoteRepeatFrom).isBefore(moment(), 'day')) {
-            alert('Cannot schedule it in the past');
-            return;
-          }
-
-          const nextDate = this.newNoteRepeatFrom;
-
-          // Add to scheduler
-          this.$set(this.scheduledNotes, newTitle, {
-            frequency: this.newNoteRepeatFrequency,
-            nextRepeatOn: nextDate,
-            isAdded: false,
-          });
-
-          this.persistSchedules();
         }
 
         this.$set(this.allEntries, newTitle, []);
@@ -586,14 +632,9 @@
         this.lastOpenedNote = newTitle;
         this.newNoteTitle = '';
         this.showNewNote = false;
-        this.newNoteRepeatFrequency = '';
-        this.newNoteRepeatFrom = '';
-        this.newNoteRepeat = false;
+        this.showNoteSelectionView = false;
       },
       cancelNewNote() {
-        this.newNoteRepeat = false;
-        this.newNoteRepeatFrequency = '';
-        this.newNoteRepeatFrom = '';
         this.newNoteTitle = '';
         this.showNewNote = false;
       },
@@ -632,7 +673,7 @@
           tmp = [];
         }
 
-        this.$set(this.allEntries, dest, [...tmp]);
+        this.$set(this.allEntries, dest, [ ...tmp ]);
         this.$delete(this.allEntries, from);
         this.persist();
       },
@@ -650,8 +691,8 @@
         }
 
         if (this.allEntries[newTitle] !== undefined
-            && this.allEntries[newTitle].length
-            && this.allEntries[newTitle].length > 0) {
+          && this.allEntries[newTitle].length
+          && this.allEntries[newTitle].length > 0) {
           alert('Sorry, the name already exists, this is not supported.');
           return;
         }
@@ -697,8 +738,10 @@
             // Show last opened note
             this.selectedDateStr = this.lastOpenedNote;
           } else {
-            // Show note list
-            this.showNoteSelectionView = true;
+            // Show first note
+            const openingTitle = this.allNotes[0];
+            this.selectedDateStr = openingTitle;
+            this.lastOpenedNote = openingTitle;
           }
         } else {
           this.selectedDateStr = this.todayStr;
@@ -716,11 +759,11 @@
 
         // Remove from source
         this.$set(this.allEntries, this.selectedDateStr,
-            this.allEntries[this.selectedDateStr].filter((val) => val.id !== this.selectedEntryId));
+          this.allEntries[this.selectedDateStr].filter((val) => val.id !== this.selectedEntryId));
 
         // Insert to target
         const targetDateEntries = this.allEntries[dateStr] || [];
-        this.$set(this.allEntries, dateStr, [...targetDateEntries, {...entry}]);
+        this.$set(this.allEntries, dateStr, [ ...targetDateEntries, { ...entry } ]);
 
         this.persist(dateStr);
         this.persist(this.selectedDateStr);
@@ -762,17 +805,17 @@
       },
       deleteSelectedEntry() {
         this.$set(this.allEntries, this.selectedDateStr,
-            this.selectedEntries.filter((val) => val.id !== this.selectedEntryId));
+          this.selectedEntries.filter((val) => val.id !== this.selectedEntryId));
         this.selectedEntryId = false;
         this.persist(this.selectedDateStr);
       },
       moveNotCompleted(toCopyEntries) {
         const newEntries = [];
-        for (const {dateStr, entry} of toCopyEntries) {
+        for (const { dateStr, entry } of toCopyEntries) {
           // Keep track of how many times this task has been delayed
           const delayCount = entry.delayCount || 0;
           // Clone entries to today's list
-          newEntries.push({...entry, delayCount: delayCount + 1});
+          newEntries.push({ ...entry, delayCount: delayCount + 1 });
           // Delete old
           const filteredEntries = this.allEntries[dateStr].filter((val) => {
             return val.id !== entry.id;
@@ -780,7 +823,7 @@
           this.$set(this.allEntries, dateStr, filteredEntries);
         }
         const existingEntries = this.allEntries[this.todayStr] || [];
-        this.$set(this.allEntries, this.todayStr, [...existingEntries, ...newEntries]);
+        this.$set(this.allEntries, this.todayStr, [ ...existingEntries, ...newEntries ]);
         this.persist();
 
         this.snackbarText = 'Moved unfinished todo to today';
@@ -789,13 +832,13 @@
       persistSchedules() {
         const myStorage = window.localStorage;
 
-        for (const [listName, obj] of Object.entries(this.scheduledNotes)) {
+        for (const [ listName, obj ] of Object.entries(this.scheduledNotes)) {
           myStorage.setItem(`REPEAT_${listName}`, JSON.stringify(obj));
         }
 
         // Delete entires that does not exist
         const keys = Object.entries(myStorage);
-        keys.forEach(([key]) => {
+        keys.forEach(([ key ]) => {
           if (key.startsWith('REPEAT_')) {
             const listName = key.slice(7);
             if (typeof this.scheduledNotes[listName] === 'undefined') {
@@ -810,13 +853,13 @@
         const myStorage = window.localStorage;
 
         if (dateStr === undefined) {
-          for (const [dateStr, entries] of Object.entries(this.allEntries)) {
+          for (const [ dateStr, entries ] of Object.entries(this.allEntries)) {
             myStorage.setItem(`TODO_${dateStr}`, JSON.stringify(entries));
           }
 
           // Delete entires that does not exist
           const keys = Object.entries(myStorage);
-          keys.forEach(([key]) => {
+          keys.forEach(([ key ]) => {
             if (key.startsWith('TODO_')) {
               const listName = key.slice(5);
               if (typeof this.allEntries[listName] === 'undefined') {
@@ -891,9 +934,9 @@
 
         if (existingEntries === undefined) {
           // Make new one
-          this.$set(this.allEntries, this.selectedDateStr, [newEntryObj]);
+          this.$set(this.allEntries, this.selectedDateStr, [ newEntryObj ]);
         } else {
-          this.$set(this.allEntries, this.selectedDateStr, [...existingEntries, newEntryObj]);
+          this.$set(this.allEntries, this.selectedDateStr, [ ...existingEntries, newEntryObj ]);
         }
 
         // Clear entry
