@@ -71,7 +71,6 @@
                    v-touch="{
                      left: () => selectNextDay(),
                      right: () => selectPrevDay(),
-                     up: () => switchMode(),
                    }"
       >
         <v-row class="ml-0">
@@ -139,6 +138,7 @@
             </v-alert>
           </v-col>
         </v-row>
+
       </v-container>
       <v-dialog v-model="showNoteSelectionView"
                 fullscreen
@@ -183,7 +183,8 @@
                 @click="selectDay(dateStr)"
                 :class="`darken-3 ${ dateStr > todayStr ? 'green--text' : ''} ${ dateStr === todayStr ? 'font-weight-bold' : ''}`"
             >
-              {{ dateStr | format_moment('ddd, MMM Do, YYYY')}}{{ dateStr === todayStr ? ' &middot; Today' : ''}}
+              {{ dateStr | format_moment('ddd, MMM Do, YYYY')}}{{ dateStr === todayStr ? ' &middot; Today'
+              : ''}}
             </v-subheader>
             <v-list-item v-for="entry in allEntries[dateStr]" :key="entry.id">
               <v-list-item-action class="mr-2" v-if="entry.isTodo">
@@ -290,6 +291,20 @@
         color="info">
       {{ snackbarText }}
     </v-snackbar>
+    <v-fab-transition>
+      <v-btn
+          v-if="activeFab !== false"
+          :key="activeFab.icon"
+          :color="activeFab.color"
+          fab
+          dark
+          bottom
+          @click="switchMode()"
+          class="ma-2"
+      >
+        <v-icon>{{ activeFab.icon }}</v-icon>
+      </v-btn>
+    </v-fab-transition>
   </v-app>
 </template>
 
@@ -343,7 +358,7 @@
       const myStorage = window.localStorage;
       const keys = Object.entries(myStorage);
 
-      keys.forEach(([ key, value ]) => {
+      keys.forEach(([key, value]) => {
         if (key.startsWith('TODO_')) {
           this.$set(this.allEntries, key.slice(5), JSON.parse(value));
         }
@@ -355,6 +370,15 @@
       console.debug('Finished loading from local storage');
     },
     computed: {
+      activeFab() {
+        if (this.datesMode) {
+          return {color: 'light-green', icon: 'mdi-file-document-outline'};
+        }
+        if (this.notesMode) {
+          return {color: 'primary', icon: 'mdi-calendar'};
+        }
+        return false;
+      },
       datesMode() {
         return /^\d\d\d\d-\d\d-\d\d$/.test(this.selectedDateStr);
       },
@@ -363,26 +387,23 @@
       },
       allDates() {
         // Most recent first
-        return Object.keys(this.allEntries)
-                     .filter(key => /^\d\d\d\d-\d\d-\d\d$/.test(key))
-                     .sort((b, a) => {
-                       if (new Date(a) < new Date(b)) {
-                         return -1;
-                       } else if (new Date(a) > new Date(b)) {
-                         return 1;
-                       }
-                       return 0;
-                     });
+        return Object.keys(this.allEntries).filter(key => /^\d\d\d\d-\d\d-\d\d$/.test(key)).sort((b, a) => {
+          if (new Date(a) < new Date(b)) {
+            return -1;
+          } else if (new Date(a) > new Date(b)) {
+            return 1;
+          }
+          return 0;
+        });
       },
       allNotes() {
-        return Object.keys(this.allEntries)
-                     .filter(key => !/^\d\d\d\d-\d\d-\d\d$/.test(key));
+        return Object.keys(this.allEntries).filter(key => !/^\d\d\d\d-\d\d-\d\d$/.test(key));
       },
       notCompleted() {
         console.debug('Update notCompleted items from past');
         const notCompleted = [];
         // Search for all to do items that hasn't been completed in the past
-        for (const [ dateStr, entries ] of Object.entries(this.allEntries)) {
+        for (const [dateStr, entries] of Object.entries(this.allEntries)) {
           if (!(/^\d\d\d\d-\d\d-\d\d$/.test(dateStr))) {
             continue; // If the entry is not a date, don't count
           }
@@ -392,7 +413,7 @@
           }
           for (const entry of entries) {
             if (entry.isTodo && !entry.completed) {
-              notCompleted.push({ dateStr, entry });
+              notCompleted.push({dateStr, entry});
             }
           }
         }
@@ -428,7 +449,7 @@
           } else if (dayDiff === -1) {
             return 'Yesterday';
           } else {
-            return `${dayDiff > 0 ? 'In ' : ''}${Math.abs(dayDiff)} days${dayDiff < 0 ? ' ago' : ''}`
+            return `${dayDiff > 0 ? 'In ' : ''}${Math.abs(dayDiff)} days${dayDiff < 0 ? ' ago' : ''}`;
           }
         }
 
@@ -455,7 +476,7 @@
       scheduleRepeats() {
         console.debug('Checking for rescheduling');
         for (const listName of Object.keys(this.scheduledNotes)) {
-          const listData = { ...this.scheduledNotes[listName] };
+          const listData = {...this.scheduledNotes[listName]};
 
           if (listData.isAdded === false
               && moment(listData.nextRepeatOn).isSameOrBefore(moment(), 'day')) {
@@ -463,32 +484,25 @@
             // Schedule next repeat if it's overdue
             switch (listData.frequency) {
               case 'Daily':
-                nextDate = moment(listData.nextRepeatOn).add(1, 'days')
-                                                        .format('YYYY-MM-DD');
+                nextDate = moment(listData.nextRepeatOn).add(1, 'days').format('YYYY-MM-DD');
                 break;
               case 'Weekly':
-                nextDate = moment(listData.nextRepeatOn).add(1, 'weeks')
-                                                        .format('YYYY-MM-DD');
+                nextDate = moment(listData.nextRepeatOn).add(1, 'weeks').format('YYYY-MM-DD');
                 break;
               case 'Bi-weekly':
-                nextDate = moment(listData.nextRepeatOn).add(2, 'weeks')
-                                                        .format('YYYY-MM-DD');
+                nextDate = moment(listData.nextRepeatOn).add(2, 'weeks').format('YYYY-MM-DD');
                 break;
               case 'Monthly':
-                nextDate = moment(listData.nextRepeatOn).add(1, 'months')
-                                                        .format('YYYY-MM-DD');
+                nextDate = moment(listData.nextRepeatOn).add(1, 'months').format('YYYY-MM-DD');
                 break;
               case 'Quarterly':
-                nextDate = moment(listData.nextRepeatOn).add(1, 'quarters')
-                                                        .format('YYYY-MM-DD');
+                nextDate = moment(listData.nextRepeatOn).add(1, 'quarters').format('YYYY-MM-DD');
                 break;
               case 'Bi-annually':
-                nextDate = moment(listData.nextRepeatOn).add(6, 'months')
-                                                        .format('YYYY-MM-DD');
+                nextDate = moment(listData.nextRepeatOn).add(6, 'months').format('YYYY-MM-DD');
                 break;
               case 'Annually':
-                nextDate = moment(listData.nextRepeatOn).add(1, 'years')
-                                                        .format('YYYY-MM-DD');
+                nextDate = moment(listData.nextRepeatOn).add(1, 'years').format('YYYY-MM-DD');
                 break;
               default:
                 console.error('Unknown frequency');
@@ -499,10 +513,10 @@
             const existingList = this.allEntries[nextDate] || [];
             const sourceList = this.allEntries[listName] || [];
             const updatedIdSourceList = sourceList.map((v) => {
-                return {...v, id:genId()};
+              return {...v, id: genId()};
             });
             // Assign new ids
-            const mergedList = [ ...existingList, ...updatedIdSourceList ];
+            const mergedList = [...existingList, ...updatedIdSourceList];
             this.$set(this.allEntries, nextDate, mergedList);
 
             // Advance next date
@@ -517,7 +531,7 @@
         }
       },
       registerScheduler() {
-        this.bgSchedulerTimerId = setInterval(this.scheduleRepeats, 10000);
+        //this.bgSchedulerTimerId = setInterval(this.scheduleRepeats, 10000);
       },
       saveNewNote() {
         const newTitle = typeof this.newNoteTitle === 'string' ? this.newNoteTitle.trim() : '';
@@ -532,10 +546,9 @@
           return;
         }
 
-
         if (this.allEntries[newTitle] !== undefined
-          && this.allEntries[newTitle].length
-          && this.allEntries[newTitle].length > 0) {
+            && this.allEntries[newTitle].length
+            && this.allEntries[newTitle].length > 0) {
           alert('Sorry, the name already exists, this is not supported.');
           return;
         }
@@ -618,7 +631,7 @@
           tmp = [];
         }
 
-        this.$set(this.allEntries, dest, [ ...tmp ]);
+        this.$set(this.allEntries, dest, [...tmp]);
         this.$delete(this.allEntries, from);
         this.persist();
       },
@@ -636,8 +649,8 @@
         }
 
         if (this.allEntries[newTitle] !== undefined
-          && this.allEntries[newTitle].length
-          && this.allEntries[newTitle].length > 0) {
+            && this.allEntries[newTitle].length
+            && this.allEntries[newTitle].length > 0) {
           alert('Sorry, the name already exists, this is not supported.');
           return;
         }
@@ -701,11 +714,12 @@
         }
 
         // Remove from source
-        this.$set(this.allEntries, this.selectedDateStr, this.allEntries[this.selectedDateStr].filter((val) => val.id !== this.selectedEntryId));
+        this.$set(this.allEntries, this.selectedDateStr,
+            this.allEntries[this.selectedDateStr].filter((val) => val.id !== this.selectedEntryId));
 
         // Insert to target
         const targetDateEntries = this.allEntries[dateStr] || [];
-        this.$set(this.allEntries, dateStr, [ ...targetDateEntries, { ...entry } ]);
+        this.$set(this.allEntries, dateStr, [...targetDateEntries, {...entry}]);
 
         this.persist(dateStr);
         this.persist(this.selectedDateStr);
@@ -746,17 +760,18 @@
         this.snackbarText = 'Copied to clipboard';
       },
       deleteSelectedEntry() {
-        this.$set(this.allEntries, this.selectedDateStr, this.selectedEntries.filter((val) => val.id !== this.selectedEntryId));
+        this.$set(this.allEntries, this.selectedDateStr,
+            this.selectedEntries.filter((val) => val.id !== this.selectedEntryId));
         this.selectedEntryId = false;
         this.persist(this.selectedDateStr);
       },
       moveNotCompleted(toCopyEntries) {
         const newEntries = [];
-        for (const { dateStr, entry } of toCopyEntries) {
+        for (const {dateStr, entry} of toCopyEntries) {
           // Keep track of how many times this task has been delayed
           const delayCount = entry.delayCount || 0;
           // Clone entries to today's list
-          newEntries.push({ ...entry, delayCount: delayCount + 1 });
+          newEntries.push({...entry, delayCount: delayCount + 1});
           // Delete old
           const filteredEntries = this.allEntries[dateStr].filter((val) => {
             return val.id !== entry.id;
@@ -764,7 +779,7 @@
           this.$set(this.allEntries, dateStr, filteredEntries);
         }
         const existingEntries = this.allEntries[this.todayStr] || [];
-        this.$set(this.allEntries, this.todayStr, [ ...existingEntries, ...newEntries ]);
+        this.$set(this.allEntries, this.todayStr, [...existingEntries, ...newEntries]);
         this.persist();
 
         this.snackbarText = 'Moved unfinished todo to today';
@@ -773,13 +788,13 @@
       persistSchedules() {
         const myStorage = window.localStorage;
 
-        for (const [ listName, obj ] of Object.entries(this.scheduledNotes)) {
+        for (const [listName, obj] of Object.entries(this.scheduledNotes)) {
           myStorage.setItem(`REPEAT_${listName}`, JSON.stringify(obj));
         }
 
         // Delete entires that does not exist
         const keys = Object.entries(myStorage);
-        keys.forEach(([ key ]) => {
+        keys.forEach(([key]) => {
           if (key.startsWith('REPEAT_')) {
             const listName = key.slice(7);
             if (typeof this.scheduledNotes[listName] === 'undefined') {
@@ -794,13 +809,13 @@
         const myStorage = window.localStorage;
 
         if (dateStr === undefined) {
-          for (const [ dateStr, entries ] of Object.entries(this.allEntries)) {
+          for (const [dateStr, entries] of Object.entries(this.allEntries)) {
             myStorage.setItem(`TODO_${dateStr}`, JSON.stringify(entries));
           }
 
           // Delete entires that does not exist
           const keys = Object.entries(myStorage);
-          keys.forEach(([ key ]) => {
+          keys.forEach(([key]) => {
             if (key.startsWith('TODO_')) {
               const listName = key.slice(5);
               if (typeof this.allEntries[listName] === 'undefined') {
@@ -875,9 +890,9 @@
 
         if (existingEntries === undefined) {
           // Make new one
-          this.$set(this.allEntries, this.selectedDateStr, [ newEntryObj ]);
+          this.$set(this.allEntries, this.selectedDateStr, [newEntryObj]);
         } else {
-          this.$set(this.allEntries, this.selectedDateStr, [ ...existingEntries, newEntryObj ]);
+          this.$set(this.allEntries, this.selectedDateStr, [...existingEntries, newEntryObj]);
         }
 
         // Clear entry
