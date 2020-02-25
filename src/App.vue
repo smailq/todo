@@ -394,9 +394,6 @@
     beforeDestroy() {
       clearInterval(this.bgSchedulerTimerId);
     },
-    created() {
-      this.registerScheduler();
-    },
     mounted() {
       this.selectedDateStr = this.todayStr;
 
@@ -413,6 +410,9 @@
           this.$set(this.scheduledNotes, key.slice(7), JSON.parse(value));
         }
       });
+
+      this.scheduleRepeats();
+      this.registerScheduler();
 
       console.debug('Finished loading from local storage');
     },
