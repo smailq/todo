@@ -687,6 +687,9 @@
       deleteList(name) {
         this.$delete(this.allEntries, name);
         this.persist();
+        // delete scheduled stuff as well
+        this.$delete(this.scheduledNotes, name);
+        this.persistSchedules();
       },
       moveList(from, dest) {
         // WARNING - IF dest EXISTS, IT WILL BE REPLACED.
