@@ -329,7 +329,7 @@
         color="info">
       {{ snackbarText }}
     </v-snackbar>
-    <v-bottom-navigation app>
+    <v-bottom-navigation app v-if="selectedEntryId === false">
       <v-list-item class="pl-0">
         <v-list-item-action class="mr-0" v-if="newEntry.startsWith(' ')">
           <v-checkbox/>
