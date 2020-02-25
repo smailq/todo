@@ -680,15 +680,29 @@
         // MAKE SURE THIS IS WHAT YOU WANT TO DO BEFORE CALLING THIS FUNC
         console.debug(`Moving list ${from} to ${dest}`);
 
-        let tmp = this.allEntries[from];
+        const tmp = this.allEntries[from];
 
         if (typeof tmp === 'undefined') {
-          tmp = [];
+          // If nothing exists, nothing to do
+          return;
         }
 
         this.$set(this.allEntries, dest, [ ...tmp ]);
         this.$delete(this.allEntries, from);
         this.persist();
+
+        // move any scheduled stuff
+        const tmpSchedule = this.scheduledNotes[from];
+
+        if (typeof tmpSchedule === 'undefined') {
+          // nothing to do if there is no schedule
+          return;
+        }
+
+        this.$set(this.scheduledNotes, dest, { ...tmpSchedule });
+        this.$delete(this.scheduledNotes, from);
+        this.persistSchedules();
+
       },
       saveEditingNote() {
         const newTitle = typeof this.editingNoteTitle === 'string' ? this.editingNoteTitle.trim() : '';
