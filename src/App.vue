@@ -16,6 +16,7 @@
              @click="switchMode()">
         <v-icon>mdi-file-document-outline</v-icon>
       </v-btn>
+
       <v-toolbar-title class="pl-0" v-if="selectedEntryId === false" @click="titleClicked">
         {{ appBarTitle }}
         <small v-if="appBarSubtitle !== ''">&middot; {{ appBarSubtitle }}</small>
@@ -49,6 +50,7 @@
           </v-list-item>
         </v-list>
       </v-menu>
+
       <v-btn icon @click="deleteSelectedEntry()" v-if="selectedEntryId !== false">
         <v-icon>mdi-delete-outline</v-icon>
       </v-btn>
@@ -60,14 +62,17 @@
              @click="selectedEntryId = false">
         <v-icon>mdi-close</v-icon>
       </v-btn>
+
       <v-btn icon
              v-if="selectedEntryId === false && datesMode && notCompleted.length > 0 && selectedDateStr === todayStr"
              @click="moveNotCompleted(notCompleted)">
         <v-icon>mdi-application-import</v-icon>
       </v-btn>
+
       <v-btn icon @click="listIconClicked" v-if="selectedEntryId === false">
         <v-icon>mdi-view-headline</v-icon>
       </v-btn>
+
     </v-app-bar>
     <v-content>
       <v-container fill-height class="align-content-start pt-0"
@@ -113,27 +118,6 @@
               </v-icon>
             </v-list-item>
           </v-list>
-        </v-row>
-        <v-row class="ml-0">
-          <v-list-item class="pl-0">
-            <v-list-item-action class="mr-0" v-if="newEntry.startsWith(' ')">
-              <v-checkbox/>
-            </v-list-item-action>
-            <v-textarea
-                v-model="newEntry"
-                auto-grow
-                flat
-                solo
-                clearable
-                full-width
-                dense
-                hide-details
-                rows="1"
-                placeholder="Type new entry here"
-                class="font-italic"
-                @focus="selectedEntryId = false"
-            />
-          </v-list-item>
         </v-row>
         <v-row class="justify-end ml-0" v-if="scheduledNotes[this.selectedDateStr] === undefined && notesMode && allEntries[this.selectedDateStr] && allEntries[this.selectedDateStr].length > 0">
           <v-btn
@@ -345,6 +329,27 @@
         color="info">
       {{ snackbarText }}
     </v-snackbar>
+    <v-bottom-navigation app>
+      <v-list-item class="pl-0">
+        <v-list-item-action class="mr-0" v-if="newEntry.startsWith(' ')">
+          <v-checkbox/>
+        </v-list-item-action>
+        <v-textarea
+            v-model="newEntry"
+            auto-grow
+            flat
+            solo
+            clearable
+            full-width
+            dense
+            hide-details
+            rows="1"
+            placeholder="Type new entry here"
+            class="font-italic"
+            @focus="selectedEntryId = false"
+        />
+      </v-list-item>
+    </v-bottom-navigation>
   </v-app>
 </template>
 
