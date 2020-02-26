@@ -119,7 +119,8 @@
             </v-list-item>
           </v-list>
         </v-row>
-        <v-row class="justify-end ml-0" v-if="scheduledNotes[this.selectedDateStr] === undefined && notesMode && allEntries[this.selectedDateStr] && allEntries[this.selectedDateStr].length > 0">
+        <v-row class="justify-end ml-0"
+               v-if="scheduledNotes[this.selectedDateStr] === undefined && notesMode && allEntries[this.selectedDateStr] && allEntries[this.selectedDateStr].length > 0">
           <v-btn
               small text class="mt-4"
               color="blue-grey darken-2"
@@ -354,6 +355,9 @@
 </template>
 
 <script>
+
+  import {mapState, mapGetters} from 'vuex';
+
   const moment = require('moment');
 
   function genId() {
@@ -369,6 +373,7 @@
       newEntry: '',
       allEntries: {},
       scheduledNotes: {},
+      selectedEntryId: false,
 
       lastOpenedListBeforeSwitch: '',
 
@@ -383,7 +388,6 @@
       bgSchedulerTimerId: null,
 
       showAutoRepeatDialog: false,
-      selectedEntryId: false,
       showListView: false,
       showMoveToDateCalendar: false,
       showEditNote: false,
@@ -436,19 +440,19 @@
       },
       allNotes() {
         return Object.keys(this.allEntries).filter(key => !/^\d\d\d\d-\d\d-\d\d$/.test(key))
-          .sort(function(a, b) {
-              const nameA = a.toUpperCase(); // ignore upper and lowercase
-              const nameB = b.toUpperCase(); // ignore upper and lowercase
-              if (nameA < nameB) {
-                return -1;
-              }
-              if (nameA > nameB) {
-                return 1;
-              }
-              // names must be equal
-              return 0;
-            }
-          );
+                     .sort(function (a, b) {
+                         const nameA = a.toUpperCase(); // ignore upper and lowercase
+                         const nameB = b.toUpperCase(); // ignore upper and lowercase
+                         if (nameA < nameB) {
+                           return -1;
+                         }
+                         if (nameA > nameB) {
+                           return 1;
+                         }
+                         // names must be equal
+                         return 0;
+                       },
+                     );
       },
       notCompleted() {
         console.debug('Update notCompleted items from past');
@@ -519,6 +523,24 @@
         }
         return this.allEntries[this.selectedDateStr];
       },
+      ...mapState([
+        // 'lists',
+        // 'schedules',
+        // 'selectedListName',
+        // 'today',
+      ]),
+      ...mapGetters([
+        // 'appBarTitle',
+        // 'appBarSubtitle',
+        // 'selectedList',
+        // 'nextMonday',
+        // 'nextSaturday',
+        // 'isDatesMode',
+        // 'isNotesMode',
+        // 'datedListNames',
+        // 'noteListNames',
+        // 'notCompletedEntries',
+      ]),
     },
     watch: {
       'newEntry': 'newEntryUpdated',
@@ -994,10 +1016,8 @@
         // Save entry
         this.persist(this.selectedDateStr);
       },
-    }
-    ,
-  }
-  ;
+    },
+  };
 </script>
 <style>
   .v-textarea.completed textarea {
