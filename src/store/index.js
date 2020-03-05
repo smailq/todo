@@ -1,11 +1,16 @@
 import Vue from 'vue'
 import Vuex from 'vuex';
+import VuexPersistence from 'vuex-persist';
 
 const moment = require('moment');
 
-Vue.use(Vuex);
+const vuexLocal = new VuexPersistence({
+  key: 'todo',
+  storage: window.localStorage
+});
 
-const debug = process.env.NODE_ENV !== 'production';
+
+Vue.use(Vuex);
 
 // Checks if the string looks like a date
 function isDate(str) {
@@ -35,50 +40,67 @@ function compareAlphabetical(a, b) {
   return 0;
 }
 
+function genId() {
+  return `${Math.random().toString(36).slice(-8)}${Math.random().toString(36).slice(-8)}`;
+}
+
+function todayStr() {
+  return moment().format('YYYY-MM-DD');
+}
+
 export default new Vuex.Store({
-  strict: debug,
+  plugins: [vuexLocal.plugin],
   state: {
     lists: {},
     schedules: {},
-
     selectedListName: '',
-
-    // TODO: Make sure this is updated frequently enough, if the user has the app
-    //       open while date changes, we need to reflect that
-    today: moment(),
   },
   getters: {
     appBarTitle: state => {
-      if (isDate(state.selectedListName)) {
-        const dayDiff = moment(state.selectedListName).diff(state.today, 'days');
-        if (dayDiff === 0) {
-          return 'Today';
-        } else if (dayDiff === 1) {
-          return 'Tomorrow';
-        } else if (dayDiff === -1) {
-          return 'Yesterday';
-        } else {
-          return `${dayDiff > 0 ? 'In ' : ''}${Math.abs(dayDiff)} days${dayDiff < 0 ? ' ago' : ''}`;
-        }
-      } else {
+      if (!isDate(state.selectedListName)) {
+        // Notes mode, just show list name as title
         return state.selectedListName;
+      } else {
+        // We are in dates mode, show more informative title
+        const selectedDate = moment(state.selectedListName);
+        return selectedDate.calendar(null, {
+          sameDay: '[Today]',
+          nextDay: '[Tomorrow]',
+          nextWeek: 'ddd, MMM D',
+          lastDay: '[Yesterday]',
+          lastWeek: 'ddd, MMM D',
+          sameElse: 'ddd, MMM D',
+        });
       }
     },
     appBarSubtitle: state => {
       if (isDate(state.selectedListName)) {
-        return moment(state.selectedListName).format('ddd, MMM D');
-      } else {
-        return '';
+        const selectedDate = moment(state.selectedListName);
+        if (selectedDate.isSame(moment(), 'day')
+          || selectedDate.isSame(moment().add(1, 'days'), 'day')
+          || selectedDate.isSame(moment().subtract(1, 'days'), 'day')) {
+          return selectedDate.calendar(null, {
+            sameDay: 'ddd, MMM D',
+            nextDay: 'ddd, MMM D',
+            nextWeek: '',
+            lastDay: 'ddd, MMM D',
+            lastWeek: '',
+            sameElse: '',
+          });
+        } else {
+          return '';
+        }
       }
+      return '';
     },
     selectedList: state => {
       return state.selectedListName !== '' ? state.lists[state.selectedListName] : [];
     },
-    nextMonday: state => {
-      return state.today.day(7 + 1);
+    nextMonday: () => {
+      return moment().day(7 + 1);
     },
-    nextSaturday: state => {
-      return state.today.day(7 + 6);
+    nextSaturday: () => {
+      return moment().day(7 + 6);
     },
     isDatesMode: state => {
       return isDate(state.selectedListName);
@@ -96,11 +118,10 @@ export default new Vuex.Store({
                    .filter(key => !isDate(key))
                    .sort(compareAlphabetical);
     },
-    notCompletedEntries: state => {
+    notCompletedEntryExist: state => {
       // TODO: Potentially slow, since it goes through all past entries in all lists
       //       Should optimize this in near future, by actively flagging past due
       //       with sort of hint/index.
-      const notCompleted = [];
       // Search for all to do items that hasn't been completed in the past
       for (const [ listName, entries ] of Object.entries(state.lists)) {
         if (!isDate(listName)) {
@@ -113,13 +134,220 @@ export default new Vuex.Store({
         // For each not completed entry, save to array along with listName
         for (const entry of entries) {
           if (entry.isTodo && !entry.completed) {
-            notCompleted.push({ listName, entry });
+            return true;
           }
         }
       }
-      return notCompleted;
+      return false;
     },
   },
-  mutations: {},
-  actions: {},
-});
+  mutations: {
+    loadLists(state, lists) {
+      state.lists = lists;
+    },
+    selectList(state, name) {
+      state.selectedListName = name;
+    }
+    ,
+    selectNextDay(state) {
+      if (isDate(state.selectedListName)) {
+        const newDate = moment(state.selectedListName).add(1, 'd');
+        state.selectedListName = newDate.format('YYYY-MM-DD');
+      }
+    }
+    ,
+    selectPrevDay(state) {
+      if (isDate(state.selectedListName)) {
+        const newDate = moment(state.selectedListName).subtract(1, 'd');
+        state.selectedListName = newDate.format('YYYY-MM-DD');
+      }
+    }
+    ,
+    addEntry(state, payload) {
+      const { listName, text, isTodo } = payload;
+
+      if (text.length < 1) {
+        return;
+      }
+
+      const newEntryObj = {
+        id: genId(),
+        text,
+        createdAt: new Date(),
+        isTodo,
+      };
+
+      // See if this looks like a link
+      if (/^https?:\/\/[^\s$.?#].[^\s]*$/i.test(text)) {
+        newEntryObj.isLink = true;
+      }
+
+      // If it's to do, it's not completed
+      if (isTodo) {
+        newEntryObj.completed = false;
+      }
+
+      const existingEntries = state.lists[listName] || [];
+
+      Vue.set(state.lists, listName, [ ...existingEntries, newEntryObj ]);
+    }
+    ,
+    moveNotCompleted(state) {
+      const entriesToMove = [];
+
+      for (const [ listName, entries ] of Object.entries(state.lists)) {
+        if (!isDate(listName)) {
+          continue; // If the list's name is not a date, ignore
+        }
+        // Skip today or future
+        if (moment(listName).isSameOrAfter(moment(), 'day')) {
+          continue;
+        }
+        // For each not completed entry, save to array along with listName
+        for (const entry of entries) {
+          if (entry.isTodo && !entry.completed) {
+            // Keep track of how many times this task has been delayed
+            const delayCount = entry.delayCount || 0;
+            // Clone entries to today's list
+            entriesToMove.push({ ...entry, delayCount: delayCount + 1 });
+            // Delete old
+            Vue.set(
+              state.lists,
+              listName,
+              state.lists[listName].filter(val => val.id !== entry.id),
+            );
+          }
+        }
+      }
+
+      const targetListName = todayStr();
+
+      // copy them to today's list
+      const existingEntries = state.lists[targetListName] || [];
+
+      Vue.set(
+        state.lists,
+        targetListName,
+        [
+          ...existingEntries,
+          ...entriesToMove,
+        ],
+      );
+    }
+    ,
+    deleteEntry(state, payload) {
+      const { listName, entryId } = payload;
+
+      Vue.set(
+        state.lists,
+        listName,
+        state.lists[listName].filter(val => val.id !== entryId),
+      );
+    }
+    ,
+    moveEntry(state, payload) {
+      const { fromListName, toListName, entryId } = payload;
+
+      const entry = state.lists[fromListName].find(v => v.id === entryId);
+
+      if (entry === undefined) {
+        alert('Sorry, couldn\'t find item to be moved');
+        return;
+      }
+
+      // Remove from source
+      Vue.set(
+        state.lists,
+        fromListName,
+        state.lists[fromListName].filter(v => v.id !== entryId),
+      );
+
+      // Insert to target
+      const existingEntries = state.lists[toListName] || [];
+      Vue.set(
+        state.lists,
+        toListName,
+        [ ...existingEntries, { ...entry } ],
+      );
+    }
+    ,
+    deleteList(state, name) {
+      Vue.delete(state.lists, name);
+      Vue.delete(state.schedules, name);
+    }
+    ,
+    moveList(state, payload) {
+      // WARNING - IF dest EXISTS, IT WILL BE REPLACED.
+      // MAKE SURE THIS IS WHAT YOU WANT TO DO BEFORE CALLING THIS FUNC
+
+      const { fromName, toName } = payload;
+
+      const tmp = state.lists[fromName];
+
+      if (typeof tmp === 'undefined') {
+        // If nothing exists, nothing to do
+        return;
+      }
+
+      Vue.set(state.lists, toName, [ ...tmp ]);
+      Vue.delete(state.lists, fromName);
+
+      // move any scheduled stuff
+      const tmpSchedule = state.schedules[fromName];
+
+      if (typeof tmpSchedule === 'undefined') {
+        // nothing to do if there is no schedule
+        return;
+      }
+
+      Vue.set(state.schedules, toName, { ...tmpSchedule });
+      Vue.delete(state.schedules, fromName);
+    },
+    addList(state, name) {
+      Vue.set(state.lists, name, []);
+    }
+    ,
+    setSchedule(state, payload) {
+      const { listName, scheduleObj } = payload;
+      Vue.set(state.schedules, listName, scheduleObj);
+    }
+    ,
+    deleteSchedule(state, name) {
+      Vue.delete(state.schedules, name);
+    }
+    ,
+    copyEntries(state, payload) {
+      const { fromListName, toListName } = payload;
+      const entries = state.lists[fromListName] || [];
+      Vue.set(
+        state.lists,
+        toListName,
+        [
+          ...state.lists[toListName],
+          ...entries.map(v => { // Re-gen id, and add indication that this entry is repeating
+            return { ...v, id: genId(), isRepeating: true };
+          }),
+        ],
+      );
+    }
+    ,
+    toggleTodoEntry(state, payload) {
+      const { listName, entryId } = payload;
+
+      const list = state.lists[listName];
+      const entry = list.find(v => v.id === entryId);
+
+      if (!entry.isTodo) {
+        return;
+      }
+
+      entry.completed = !entry.completed;
+    }
+    ,
+
+  }
+  ,
+  actions: {}
+  ,
+})
+;

@@ -2,17 +2,17 @@
   <v-app>
     <v-app-bar
         app
-        :color="selectedEntryId === false ? (notesMode ? 'green' : 'primary') : 'blue-grey'"
+        :color="selectedEntryId === false ? (isNotesMode ? 'green' : 'primary') : 'blue-grey'"
         dark
         dense
     >
       <v-btn icon
-             v-if="selectedEntryId === false && datesMode"
+             v-if="selectedEntryId === false && isDatesMode"
              @click="switchMode()">
         <v-icon>mdi-calendar</v-icon>
       </v-btn>
       <v-btn icon
-             v-if="selectedEntryId === false && notesMode"
+             v-if="selectedEntryId === false && isNotesMode"
              @click="switchMode()">
         <v-icon>mdi-file-document-outline</v-icon>
       </v-btn>
@@ -29,17 +29,17 @@
           </v-btn>
         </template>
         <v-list>
-          <v-list-item two-line v-if="nextMondayStr !== ''" @click="moveSelectedEntryTo(nextMondayStr)">
+          <v-list-item two-line @click="moveSelectedEntryTo(nextMonday.format('YYYY-MM-DD'))">
             <v-list-item-content>
               <v-list-item-title>Next week</v-list-item-title>
-              <v-list-item-subtitle>{{ nextMondayStr | format_moment('ddd, MMM Do') }}
+              <v-list-item-subtitle>{{ nextMonday.format('ddd, MMM Do') }}
               </v-list-item-subtitle>
             </v-list-item-content>
           </v-list-item>
-          <v-list-item v-if="nextSaturdayStr !== ''" @click="moveSelectedEntryTo(nextSaturdayStr)">
+          <v-list-item @click="moveSelectedEntryTo(nextSaturday.format('YYYY-MM-DD'))">
             <v-list-item-content>
               <v-list-item-title>Next weekend</v-list-item-title>
-              <v-list-item-subtitle>{{ nextSaturdayStr | format_moment('ddd, MMM Do') }}
+              <v-list-item-subtitle>{{ nextSaturday.format('ddd, MMM Do') }}
               </v-list-item-subtitle>
             </v-list-item-content>
           </v-list-item>
@@ -51,7 +51,10 @@
         </v-list>
       </v-menu>
 
-      <v-btn icon @click="deleteSelectedEntry()" v-if="selectedEntryId !== false">
+      <v-btn
+          icon
+          @click="deleteEntry"
+          v-if="selectedEntryId !== false">
         <v-icon>mdi-delete-outline</v-icon>
       </v-btn>
 
@@ -64,8 +67,8 @@
       </v-btn>
 
       <v-btn icon
-             v-if="selectedEntryId === false && datesMode && notCompleted.length > 0 && selectedDateStr === todayStr"
-             @click="moveNotCompleted(notCompleted)">
+             v-if="selectedEntryId === false && isDatesMode && notCompletedEntryExist && selectedListName === todayStr"
+             @click="$store.commit('moveNotCompleted')">
         <v-icon>mdi-application-import</v-icon>
       </v-btn>
 
@@ -77,17 +80,19 @@
     <v-content>
       <v-container fill-height class="align-content-start pt-0"
                    v-touch="{
-                     left: () => selectNextDay(),
-                     right: () => selectPrevDay(),
+                     left: () => $store.commit('selectNextDay'),
+                     right: () => $store.commit('selectPrevDay'),
                    }"
       >
         <v-row class="ml-0">
           <v-list dense class="flex-grow-1">
-            <v-list-item v-for="(entry) in selectedEntries" :key="entry.id"
-                         class="pl-0 pr-0"
-                         @change="persist(selectedDateStr)">
+            <v-list-item v-for="(entry) in selectedList" :key="entry.id"
+                         class="pl-0 pr-0">
               <v-list-item-action class="mr-0" v-if="entry.isTodo">
-                <v-checkbox v-model="entry.completed"/>
+                <v-checkbox
+                    v-model="entry.completed"
+                    @change="checked"
+                />
               </v-list-item-action>
               <v-list-item-action v-else-if="entry.isLink" class="mr-0">
                 <a :href="entry.text" target="_blank" style="text-decoration: none;">
@@ -120,7 +125,7 @@
           </v-list>
         </v-row>
         <v-row class="justify-end ml-0"
-               v-if="scheduledNotes[this.selectedDateStr] === undefined && notesMode && allEntries[this.selectedDateStr] && allEntries[this.selectedDateStr].length > 0">
+               v-if="schedules[selectedListName] === undefined && isNotesMode && lists[selectedListName] && lists[selectedListName].length > 0">
           <v-btn
               small text class="mt-4"
               color="blue-grey darken-2"
@@ -133,14 +138,14 @@
             class="mt-4"
             color="blue-grey"
             dark
-            v-if="notesMode && scheduledNotes[this.selectedDateStr]"
+            v-if="isNotesMode && schedules[selectedListName]"
         >
           <v-list-item three-line>
             <v-list-item-content>
-              <v-list-item-title><b>Auto Repeat {{ scheduledNotes[this.selectedDateStr].frequency }}</b>
+              <v-list-item-title><b>Auto Repeat {{ schedules[selectedListName].frequency }}</b>
               </v-list-item-title>
               <v-list-item-subtitle class="white--text">All entries in this note will be added to the calendar on <b>{{
-                scheduledNotes[this.selectedDateStr].nextRepeatOn }}</b>.
+                schedules[selectedListName].nextRepeatOn }}</b>.
               </v-list-item-subtitle>
             </v-list-item-content>
           </v-list-item>
@@ -178,11 +183,11 @@
             </v-btn>
           </v-toolbar>
           <v-list>
-            <v-list-item v-for="noteName in allNotes" :key="noteName" @click="selectNote(noteName)">
+            <v-list-item v-for="noteName in noteListNames" :key="noteName" @click="selectNote(noteName)">
               <v-list-item-content>
                 <v-list-item-title>
                   {{ noteName }}
-                  <v-icon small v-if="scheduledNotes[noteName]" class="ml-2">mdi-repeat</v-icon>
+                  <v-icon small v-if="schedules[noteName]" class="ml-2">mdi-repeat</v-icon>
                 </v-list-item-title>
               </v-list-item-content>
             </v-list-item>
@@ -200,17 +205,17 @@
               <v-icon>mdi-close</v-icon>
             </v-btn>
           </v-toolbar>
-          <v-list v-for="dateStr in allDates" :key="dateStr">
+          <v-list v-for="dateStr in datedListNames" :key="dateStr">
             <v-divider v-if="dateStr === todayStr"/>
             <v-subheader
                 @click="selectDay(dateStr)"
-                v-if="allEntries[dateStr] && allEntries[dateStr].length > 0"
+                v-if="lists[dateStr] && lists[dateStr].length > 0"
                 :class="`darken-3 ${ dateStr > todayStr ? 'green--text' : ''} ${ dateStr === todayStr ? 'font-weight-bold' : ''}`"
             >
-              {{ dateStr | format_moment('ddd, MMM Do, YYYY')}}{{ dateStr === todayStr ? ' &middot; Today'
+              {{ dateStr | format_moment('ddd, MMM Do, YYYY')}}{{ dateStr === todayStr ? ' &middot;Today'
               : ''}}
             </v-subheader>
-            <v-list-item v-for="entry in allEntries[dateStr]" :key="entry.id">
+            <v-list-item v-for="entry in lists[dateStr]" :key="entry.id">
               <v-list-item-action class="mr-2" v-if="entry.isTodo">
                 <v-checkbox disabled v-model="entry.completed"/>
               </v-list-item-action>
@@ -355,14 +360,8 @@
 </template>
 
 <script>
-
   import {mapState, mapGetters} from 'vuex';
-
   const moment = require('moment');
-
-  function genId() {
-    return `${Math.random().toString(36).slice(-8)}${Math.random().toString(36).slice(-8)}`;
-  }
 
   export default {
     name: 'App',
@@ -371,19 +370,18 @@
       snackbarText: '',
 
       newEntry: '',
-      allEntries: {},
-      scheduledNotes: {},
+
       selectedEntryId: false,
 
       lastOpenedListBeforeSwitch: '',
 
-      selectedDateStr: '',
       editingNoteTitle: '',
+
       newNoteTitle: '',
-      newNoteRepeat: false,
+
       newNoteRepeatFrequency: '',
-      showNewNoteDatePicker: false,
       newNoteRepeatFrom: '',
+      showNewNoteDatePicker: false,
 
       bgSchedulerTimerId: null,
 
@@ -393,163 +391,53 @@
       showEditNote: false,
       showNewNote: false,
       showNoteSelectionView: false,
+
       moveToDateTargetStr: moment().format('YYYY-MM-DD'),
+
+      todayStr: moment().format('YYYY-MM-DD'),
     }),
     beforeDestroy() {
-      clearInterval(this.bgSchedulerTimerId);
+      // clearInterval(this.bgSchedulerTimerId);
     },
     mounted() {
-      this.selectedDateStr = this.todayStr;
-
-      console.debug('Start loading from local storage');
-
-      const myStorage = window.localStorage;
-      const keys = Object.entries(myStorage);
-
-      keys.forEach(([ key, value ]) => {
-        if (key.startsWith('TODO_')) {
-          this.$set(this.allEntries, key.slice(5), JSON.parse(value));
-        }
-        if (key.startsWith('REPEAT_')) {
-          this.$set(this.scheduledNotes, key.slice(7), JSON.parse(value));
-        }
-      });
-
+      this.$store.commit('selectList', this.todayStr);
       this.scheduleRepeats();
       this.registerScheduler();
-
-      console.debug('Finished loading from local storage');
     },
     computed: {
-      datesMode() {
-        return /^\d\d\d\d-\d\d-\d\d$/.test(this.selectedDateStr);
-      },
-      notesMode() {
-        return !this.datesMode;
-      },
-      allDates() {
-        // Most recent first
-        return Object.keys(this.allEntries).filter(key => /^\d\d\d\d-\d\d-\d\d$/.test(key)).sort((b, a) => {
-          if (new Date(a) < new Date(b)) {
-            return -1;
-          } else if (new Date(a) > new Date(b)) {
-            return 1;
-          }
-          return 0;
-        });
-      },
-      allNotes() {
-        return Object.keys(this.allEntries).filter(key => !/^\d\d\d\d-\d\d-\d\d$/.test(key))
-                     .sort(function (a, b) {
-                         const nameA = a.toUpperCase(); // ignore upper and lowercase
-                         const nameB = b.toUpperCase(); // ignore upper and lowercase
-                         if (nameA < nameB) {
-                           return -1;
-                         }
-                         if (nameA > nameB) {
-                           return 1;
-                         }
-                         // names must be equal
-                         return 0;
-                       },
-                     );
-      },
-      notCompleted() {
-        console.debug('Update notCompleted items from past');
-        const notCompleted = [];
-        // Search for all to do items that hasn't been completed in the past
-        for (const [ dateStr, entries ] of Object.entries(this.allEntries)) {
-          if (!(/^\d\d\d\d-\d\d-\d\d$/.test(dateStr))) {
-            continue; // If the entry is not a date, don't count
-          }
-          // Skip today or future
-          if (dateStr === this.todayStr || new Date(dateStr) > new Date(this.todayStr)) {
-            continue;
-          }
-          for (const entry of entries) {
-            if (entry.isTodo && !entry.completed) {
-              notCompleted.push({ dateStr, entry });
-            }
-          }
-        }
-        console.debug(`Finished loading ${notCompleted.length} notCompleted items`);
-        return notCompleted;
-      },
-      todayStr() {
-        return moment().format('YYYY-MM-DD');
-      },
-      nextMondayStr() {
-        const nextMonday = moment(this.todayStr).day(7 + 1);
-        if (nextMonday > moment()) {
-          return nextMonday.format('YYYY-MM-DD');
-        }
-        // If this friday is past or same day, ignore
-        return '';
-      },
-      nextSaturdayStr() {
-        const nextSaturday = moment(this.todayStr).day(7 + 6);
-        if (nextSaturday > moment()) {
-          return nextSaturday.format('YYYY-MM-DD');
-        }
-        // If this friday is past or same day, ignore
-        return '';
-      },
-      appBarTitle() {
-        if (/^\d\d\d\d-\d\d-\d\d$/.test(this.selectedDateStr)) {
-          const dayDiff = moment(this.selectedDateStr).diff(moment(this.todayStr), 'days');
-          if (dayDiff === 0) {
-            return 'Today';
-          } else if (dayDiff === 1) {
-            return 'Tomorrow';
-          } else if (dayDiff === -1) {
-            return 'Yesterday';
-          } else {
-            return `${dayDiff > 0 ? 'In ' : ''}${Math.abs(dayDiff)} days${dayDiff < 0 ? ' ago' : ''}`;
-          }
-        }
-
-        return this.selectedDateStr;
-      },
-      appBarSubtitle() {
-        if (/^\d\d\d\d-\d\d-\d\d$/.test(this.selectedDateStr)) {
-          return moment(this.selectedDateStr).format('ddd, MMM D');
-        }
-
-        return '';
-      },
-      selectedEntries() {
-        if (this.selectedDateStr === '') {
-          return [];
-        }
-        return this.allEntries[this.selectedDateStr];
-      },
       ...mapState([
-        // 'lists',
-        // 'schedules',
-        // 'selectedListName',
-        // 'today',
+        'lists',
+        'schedules',
+        'selectedListName',
       ]),
       ...mapGetters([
-        // 'appBarTitle',
-        // 'appBarSubtitle',
-        // 'selectedList',
-        // 'nextMonday',
-        // 'nextSaturday',
-        // 'isDatesMode',
-        // 'isNotesMode',
-        // 'datedListNames',
-        // 'noteListNames',
-        // 'notCompletedEntries',
+        'appBarTitle',
+        'appBarSubtitle',
+        'selectedList',
+        'nextMonday',
+        'nextSaturday',
+        'isDatesMode',
+        'isNotesMode',
+        'datedListNames',
+        'noteListNames',
+        'notCompletedEntryExist',
       ]),
     },
     watch: {
       'newEntry': 'newEntryUpdated',
     },
     methods: {
+      checked() {
+        // console.log('asrerer');
+      },
+      deleteEntry() {
+        this.$store.commit('deleteEntry', { listName: this.selectedListName, entryId: this.selectedEntryId});
+        this.selectedEntryId = false;
+      },
       scheduleRepeats() {
         console.debug('Checking for rescheduling');
-        for (const listName of Object.keys(this.scheduledNotes)) {
-          const listData = { ...this.scheduledNotes[listName] };
+        for (const listName of Object.keys(this.schedules)) {
+          const listData = { ...this.schedules[listName] };
           if (moment(listData.nextRepeatOn).isSame(moment(), 'day')) {
             let nextDate = '';
             // Schedule next repeat if it's overdue
@@ -580,33 +468,14 @@
                 return;
             }
 
-            // Add items to target date
-            const existingList = this.allEntries[listData.nextRepeatOn] || [];
-
-            const sourceList = this.allEntries[listName] || [];
-
-            if (sourceList.length < 1) {
-              // nothing to add, do nothing
-              return;
-            }
-
-            // Regenerate id when duplicating
-            const updatedIdSourceList = sourceList.map((v) => {
-              return { ...v, id: genId(), isRepeating: true };
-            });
-
-            // Assign new ids
-            const mergedList = [ ...existingList, ...updatedIdSourceList ];
-            this.$set(this.allEntries, listData.nextRepeatOn, mergedList);
-            this.persist(listData.nextRepeatOn);
-
-            console.debug(`Scheduler: Added to ${listData.nextRepeatOn} with `, sourceList);
+            this.$store.commit(
+              'copyEntries',
+              {fromListName: listName, toListName: listData.nextRepeatOn}
+              );
 
             // Advance next date
             listData.nextRepeatOn = nextDate;
-            this.$set(this.scheduledNotes, listName, listData);
-            this.persistSchedules();
-
+            this.$store.commit('setSchedule', {listName, scheduleObj: listData});
           }
         }
       },
@@ -615,17 +484,16 @@
       },
       removeAutoRepeat() {
         // Add to scheduler
-        this.$delete(this.scheduledNotes, this.selectedDateStr);
-        this.persistSchedules();
+        this.$store.commit('deleteSchedule', this.selectedListName);
         this.cancelAutoRepeat();
       },
       editAutoRepeat() {
-        if (this.scheduledNotes[this.selectedDateStr] === undefined) {
+        if (this.schedules[this.selectedListName] === undefined) {
           console.debug('Trying to edit non-existing scheduled repeat, this is noop.');
           return;
         }
-        this.newNoteRepeatFrequency = this.scheduledNotes[this.selectedDateStr].frequency;
-        this.newNoteRepeatFrom = this.scheduledNotes[this.selectedDateStr].nextRepeatOn;
+        this.newNoteRepeatFrequency = this.schedules[this.selectedListName].frequency;
+        this.newNoteRepeatFrom = this.schedules[this.selectedListName].nextRepeatOn;
         this.showAutoRepeatDialog = true;
       },
       saveAutoRepeat() {
@@ -645,12 +513,14 @@
         const nextDate = this.newNoteRepeatFrom;
 
         // Add to scheduler
-        this.$set(this.scheduledNotes, this.selectedDateStr, {
-          frequency: this.newNoteRepeatFrequency,
-          nextRepeatOn: nextDate,
+        this.$store.commit('setSchedule', {
+          listName: this.selectedListName,
+          scheduleObj: {
+            frequency: this.newNoteRepeatFrequency,
+            nextRepeatOn: nextDate,
+          },
         });
 
-        this.persistSchedules();
         this.cancelAutoRepeat();
       },
       cancelAutoRepeat() {
@@ -671,17 +541,16 @@
           return;
         }
 
-        if (this.allEntries[newTitle] !== undefined
-          && this.allEntries[newTitle].length
-          && this.allEntries[newTitle].length > 0) {
+        if (this.lists[newTitle] !== undefined
+          && this.lists[newTitle].length
+          && this.lists[newTitle].length > 0) {
           alert('Sorry, the name already exists, this is not supported.');
           return;
         }
 
-        this.$set(this.allEntries, newTitle, []);
-        this.persist(newTitle);
+        this.$store.commit('addList', newTitle);
+        this.$store.commit('selectList', newTitle);
 
-        this.selectedDateStr = newTitle;
         this.newNoteTitle = '';
         this.showNewNote = false;
         this.showNoteSelectionView = false;
@@ -691,84 +560,43 @@
         this.showNewNote = false;
       },
       deleteNote() {
-        const r = confirm(`Are you sure about deleting "${this.selectedDateStr}"? This can not be undone!`);
+        const r = confirm(`Are you sure about deleting "${this.selectedListName}"? This can not be undone!`);
         if (r !== true) {
           return;
         }
 
         this.removeAutoRepeat();
-        this.deleteList(this.selectedDateStr);
+        this.$store.commit('deleteList', this.selectedListName);
 
-        let existingNote = this.allNotes.length > 0 ? this.allNotes[0] : false;
+        let existingNote = this.noteListNames.length > 0 ? this.noteListNames[0] : false;
 
         if (existingNote === false) {
           // No other existing note to open, create an untitled one. (without saving)
-          this.$set(this.allEntries, 'Untitled', []);
           existingNote = 'Untitled';
         }
 
+        this.selectedEntryId = false;
         this.showEditNote = false;
-        this.selectedDateStr = existingNote;
-
-      },
-      deleteList(name) {
-        this.$delete(this.allEntries, name);
-        this.persist();
-        // delete scheduled stuff as well
-        this.$delete(this.scheduledNotes, name);
-        this.persistSchedules();
-      },
-      moveList(from, dest) {
-        // WARNING - IF dest EXISTS, IT WILL BE REPLACED.
-        // MAKE SURE THIS IS WHAT YOU WANT TO DO BEFORE CALLING THIS FUNC
-        console.debug(`Moving list ${from} to ${dest}`);
-
-        const tmp = this.allEntries[from];
-
-        if (typeof tmp === 'undefined') {
-          // If nothing exists, nothing to do
-          return;
-        }
-
-        this.$set(this.allEntries, dest, [ ...tmp ]);
-        this.$delete(this.allEntries, from);
-        this.persist();
-
-        // move any scheduled stuff
-        const tmpSchedule = this.scheduledNotes[from];
-
-        if (typeof tmpSchedule === 'undefined') {
-          // nothing to do if there is no schedule
-          return;
-        }
-
-        this.$set(this.scheduledNotes, dest, { ...tmpSchedule });
-        this.$delete(this.scheduledNotes, from);
-        this.persistSchedules();
-
+        this.$store.commit('selectList', existingNote);
       },
       saveEditingNote() {
         const newTitle = typeof this.editingNoteTitle === 'string' ? this.editingNoteTitle.trim() : '';
-
-        if (/^\d\d\d\d-\d\d-\d\d$/.test(newTitle)) {
-          alert('Sorry, your new title looks like a date - this is not supported.');
-          return;
-        }
 
         if (newTitle.length < 1) {
           alert('Sorry, title can not be empty.');
           return;
         }
 
-        if (this.allEntries[newTitle] !== undefined
-          && this.allEntries[newTitle].length
-          && this.allEntries[newTitle].length > 0) {
+        if (this.lists[newTitle] !== undefined
+          && this.lists[newTitle].length
+          && this.lists[newTitle].length > 0) {
           alert('Sorry, the name already exists, this is not supported.');
           return;
         }
 
-        this.moveList(this.selectedDateStr, newTitle);
-        this.selectedDateStr = newTitle;
+        this.$store.commit('moveList', { fromName: this.selectedListName, toName: newTitle });
+        this.$store.commit('selectList', newTitle);
+
         this.editingNoteTitle = '';
         this.showEditNote = false;
       },
@@ -777,67 +605,53 @@
         this.editingNoteTitle = '';
       },
       listIconClicked() {
-        if (this.datesMode) {
+        if (this.isDatesMode) {
           this.showListView = true;
-        } else if (this.notesMode) {
+        } else if (this.isNotesMode) {
           this.showNoteSelectionView = true;
         }
       },
       titleClicked() {
-        if (this.datesMode) {
-          this.selectedDateStr = this.todayStr;
-        } else if (this.notesMode) {
-          this.editingNoteTitle = this.selectedDateStr;
+        if (this.isDatesMode) {
+          this.$store.commit('selectList', this.todayStr);
+        } else if (this.isNotesMode) {
+          this.editingNoteTitle = this.selectedListName;
           this.showEditNote = true;
         }
       },
       selectNote(name) {
-        this.selectedDateStr = name;
+        this.$store.commit('selectList', name);
         this.showNoteSelectionView = false;
       },
       switchMode() {
         const prevList = `${this.lastOpenedListBeforeSwitch}`;
-        this.lastOpenedListBeforeSwitch = this.selectedDateStr;
+        this.lastOpenedListBeforeSwitch = this.selectedListName;
 
-        if (/^\d\d\d\d-\d\d-\d\d$/.test(this.selectedDateStr)) {
+        if (this.isDatesMode) {
           // If there are no notes, create one called 'Untitled' and open that
-          if (this.allNotes.length < 1) {
-            this.selectedDateStr = 'Untitled';
+          if (this.noteListNames.length < 1) {
+            this.$store.commit('selectList', 'Untitled');
           } else if (prevList !== '') {
             // Show last opened note
-            this.selectedDateStr = prevList;
+            this.$store.commit('selectList', prevList);
           } else {
             // Show first note
-            this.selectedDateStr = this.allNotes[0];
+            this.$store.commit('selectList', this.noteListNames[0]);
           }
         } else {
           if (prevList !== '') {
-            this.selectedDateStr = prevList;
+            this.$store.commit('selectList', prevList);
           } else {
-            this.selectedDateStr = this.todayStr;
+            this.$store.commit('selectList', this.todayStr);
           }
         }
       },
       moveSelectedEntryTo(dateStr) {
-        console.log(`Moving item ${this.selectedEntryId} to ${dateStr}`);
-
-        const entry = this.allEntries[this.selectedDateStr].find((val) => val.id === this.selectedEntryId);
-
-        if (entry === undefined) {
-          alert('Sorry, couldn\'t find item to be moved');
-          return;
-        }
-
-        // Remove from source
-        this.$set(this.allEntries, this.selectedDateStr,
-          this.allEntries[this.selectedDateStr].filter((val) => val.id !== this.selectedEntryId));
-
-        // Insert to target
-        const targetDateEntries = this.allEntries[dateStr] || [];
-        this.$set(this.allEntries, dateStr, [ ...targetDateEntries, { ...entry } ]);
-
-        this.persist(dateStr);
-        this.persist(this.selectedDateStr);
+        this.$store.commit('moveEntry', {
+          fromListName: this.selectedListName,
+          toListName: dateStr,
+          entryId: this.selectedEntryId,
+        });
 
         // Close calendar picker if open
         this.showMoveToDateCalendar = false;
@@ -846,23 +660,9 @@
         // Message
         this.showSnackbar = true;
         this.snackbarText = `Moved entry to ${moment(dateStr).format('ddd, MMM Do')}`;
-
-        console.log(`Move successful`);
-      },
-      selectNextDay() {
-        if (/^\d\d\d\d-\d\d-\d\d$/.test(this.selectedDateStr)) {
-          const newDate = moment(this.selectedDateStr).add(1, 'd');
-          this.selectedDateStr = newDate.format('YYYY-MM-DD');
-        }
-      },
-      selectPrevDay() {
-        if (/^\d\d\d\d-\d\d-\d\d$/.test(this.selectedDateStr)) {
-          const newDate = moment(this.selectedDateStr).subtract(1, 'd');
-          this.selectedDateStr = newDate.format('YYYY-MM-DD');
-        }
       },
       selectDay(dateStr) {
-        this.selectedDateStr = dateStr;
+        this.$store.commit('selectList', dateStr);
         // close dialogs
         this.showListView = false;
         // Clear selections in case
@@ -873,77 +673,6 @@
         document.execCommand('copy');
         this.showSnackbar = true;
         this.snackbarText = 'Copied to clipboard';
-      },
-      deleteSelectedEntry() {
-        this.$set(this.allEntries, this.selectedDateStr,
-          this.selectedEntries.filter((val) => val.id !== this.selectedEntryId));
-        this.selectedEntryId = false;
-        this.persist(this.selectedDateStr);
-      },
-      moveNotCompleted(toCopyEntries) {
-        const newEntries = [];
-        for (const { dateStr, entry } of toCopyEntries) {
-          // Keep track of how many times this task has been delayed
-          const delayCount = entry.delayCount || 0;
-          // Clone entries to today's list
-          newEntries.push({ ...entry, delayCount: delayCount + 1 });
-          // Delete old
-          const filteredEntries = this.allEntries[dateStr].filter((val) => {
-            return val.id !== entry.id;
-          });
-          this.$set(this.allEntries, dateStr, filteredEntries);
-        }
-        const existingEntries = this.allEntries[this.todayStr] || [];
-        this.$set(this.allEntries, this.todayStr, [ ...existingEntries, ...newEntries ]);
-        this.persist();
-
-        this.snackbarText = 'Moved unfinished todo to today';
-        this.showSnackbar = true;
-      },
-      persistSchedules() {
-        const myStorage = window.localStorage;
-
-        for (const [ listName, obj ] of Object.entries(this.scheduledNotes)) {
-          myStorage.setItem(`REPEAT_${listName}`, JSON.stringify(obj));
-        }
-
-        // Delete entires that does not exist
-        const keys = Object.entries(myStorage);
-        keys.forEach(([ key ]) => {
-          if (key.startsWith('REPEAT_')) {
-            const listName = key.slice(7);
-            if (typeof this.scheduledNotes[listName] === 'undefined') {
-              myStorage.removeItem(key);
-            } else if (this.scheduledNotes[listName].length && this.scheduledNotes[listName].length < 1) {
-              myStorage.removeItem(key);
-            }
-          }
-        });
-      },
-      persist(dateStr) {
-        const myStorage = window.localStorage;
-
-        if (dateStr === undefined) {
-          for (const [ dateStr, entries ] of Object.entries(this.allEntries)) {
-            myStorage.setItem(`TODO_${dateStr}`, JSON.stringify(entries));
-          }
-
-          // Delete entires that does not exist
-          const keys = Object.entries(myStorage);
-          keys.forEach(([ key ]) => {
-            if (key.startsWith('TODO_')) {
-              const listName = key.slice(5);
-              if (typeof this.allEntries[listName] === 'undefined') {
-                myStorage.removeItem(key);
-              } else if (this.allEntries[listName].length && this.allEntries[listName].length < 1) {
-                myStorage.removeItem(key);
-              }
-            }
-          });
-
-        } else if (typeof dateStr === 'string' && dateStr.length > 0) {
-          myStorage.setItem(`TODO_${dateStr}`, JSON.stringify(this.allEntries[dateStr]));
-        }
       },
       newEntryUpdated(after, before) {
         // do nothing on empty content
@@ -975,46 +704,14 @@
           }
 
           // save new entry without newline
-          this.save(trimmedEntry, isTodo);
+          this.$store.commit('addEntry', {
+            listName: this.selectedListName,
+            text: trimmedEntry,
+            isTodo,
+          });
+
+          this.newEntry = '';
         }
-      },
-      save(text, isTodo) {
-        if (text.length < 1) {
-          return;
-        }
-
-        const newEntryObj = {
-          // Random id, hope it's unique enough..
-          id: genId(),
-          text,
-          createdAt: new Date(),
-          isTodo,
-        };
-
-        // See if this looks like a link
-        if (/^https?:\/\/[^\s$.?#].[^\s]*$/i.test(text)) {
-          newEntryObj.isLink = true;
-        }
-
-        if (isTodo) {
-          newEntryObj.completed = false;
-        }
-
-        // Save entry to currently selected date
-        const existingEntries = this.allEntries[this.selectedDateStr];
-
-        if (existingEntries === undefined) {
-          // Make new one
-          this.$set(this.allEntries, this.selectedDateStr, [ newEntryObj ]);
-        } else {
-          this.$set(this.allEntries, this.selectedDateStr, [ ...existingEntries, newEntryObj ]);
-        }
-
-        // Clear entry
-        this.newEntry = '';
-
-        // Save entry
-        this.persist(this.selectedDateStr);
       },
     },
   };
