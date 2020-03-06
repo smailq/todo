@@ -2,80 +2,37 @@
   <v-app>
     <v-app-bar
         app
-        :color="selectedEntryId === false ? (isNotesMode ? 'green' : 'primary') : 'blue-grey'"
+        :color="isNotesMode ? 'green' : 'primary'"
         dark
         dense
     >
       <v-btn icon
-             v-if="selectedEntryId === false && isDatesMode"
+             v-if="isDatesMode"
              @click="switchMode()">
         <v-icon>mdi-calendar</v-icon>
       </v-btn>
       <v-btn icon
-             v-if="selectedEntryId === false && isNotesMode"
+             v-if="isNotesMode"
              @click="switchMode()">
         <v-icon>mdi-file-document-outline</v-icon>
       </v-btn>
 
-      <v-toolbar-title class="pl-0" v-if="selectedEntryId === false" @click="titleClicked">
+      <v-toolbar-title class="pl-0" @click="titleClicked">
         {{ appBarTitle }}
         <small v-if="appBarSubtitle !== ''">&middot; {{ appBarSubtitle }}</small>
       </v-toolbar-title>
 
-      <v-menu bottom right v-if="selectedEntryId !== false">
-        <template v-slot:activator="{ on }">
-          <v-btn icon v-on="on">
-            <v-icon>mdi-clock</v-icon>
-          </v-btn>
-        </template>
-        <v-list>
-          <v-list-item two-line @click="moveSelectedEntryTo(nextMonday.format('YYYY-MM-DD'))">
-            <v-list-item-content>
-              <v-list-item-title>Next week</v-list-item-title>
-              <v-list-item-subtitle>{{ nextMonday.format('ddd, MMM Do') }}
-              </v-list-item-subtitle>
-            </v-list-item-content>
-          </v-list-item>
-          <v-list-item @click="moveSelectedEntryTo(nextSaturday.format('YYYY-MM-DD'))">
-            <v-list-item-content>
-              <v-list-item-title>Next weekend</v-list-item-title>
-              <v-list-item-subtitle>{{ nextSaturday.format('ddd, MMM Do') }}
-              </v-list-item-subtitle>
-            </v-list-item-content>
-          </v-list-item>
-          <v-list-item @click="showMoveToDateCalendar = true">
-            <v-list-item-content>
-              <v-list-item-title>Select date</v-list-item-title>
-            </v-list-item-content>
-          </v-list-item>
-        </v-list>
-      </v-menu>
-
-      <v-btn
-          icon
-          @click="deleteEntry"
-          v-if="selectedEntryId !== false">
-        <v-icon>mdi-delete-outline</v-icon>
-      </v-btn>
-
       <v-spacer/>
 
       <v-btn icon
-             v-if="selectedEntryId !== false"
-             @click="selectedEntryId = false">
-        <v-icon>mdi-close</v-icon>
-      </v-btn>
-
-      <v-btn icon
-             v-if="selectedEntryId === false && isDatesMode && notCompletedEntryExist && selectedListName === todayStr"
+             v-if="isDatesMode && notCompletedEntryExist && selectedListName === todayStr"
              @click="$store.commit('moveNotCompleted')">
         <v-icon>mdi-application-import</v-icon>
       </v-btn>
 
-      <v-btn icon @click="listIconClicked" v-if="selectedEntryId === false">
+      <v-btn icon @click="listIconClicked">
         <v-icon>mdi-view-headline</v-icon>
       </v-btn>
-
     </v-app-bar>
     <v-content>
       <v-container fluid
@@ -87,7 +44,9 @@
                    }"
       >
         <v-list class="flex-grow-1">
-          <v-list-item v-for="entry in selectedList" :key="entry.id">
+          <v-list-item v-for="(entry, index) in selectedList"
+                       :key="entry.id"
+          >
             <v-list-item-action v-if="entry.isTodo" class="mr-3">
               <v-checkbox
                   :input-value="entry.completed"
@@ -102,9 +61,16 @@
             <v-list-item-action v-else class="mr-3">
               <v-icon>mdi-circle-small</v-icon>
             </v-list-item-action>
-            <v-list-item-content>
+            <v-list-item-content
+                @click="() => selectEntry(index)"
+            >
               <v-list-item-title style="white-space:normal;" :class="`body-1 ${entry.completed ? 'completed' : ''}`">
-                {{ entry.text }}
+                {{ entry.text.split(/\r\n|\r|\n/)[0] }}
+                <small color="grey"
+                       v-if="entry.text.split(/\r\n|\r|\n/).length > 1"
+                >
+                  ...
+                </small>
                 <small class="red--text" v-if="entry.delayCount">
                   {{ entry.delayCount }}
                 </small>
@@ -148,6 +114,68 @@
           </v-card-actions>
         </v-card>
       </v-container>
+
+      <v-dialog :value="selectedEntry !== undefined"
+                fullscreen
+                hide-overlay
+                transition="dialog-bottom-transition">
+        <v-card tile>
+          <v-toolbar dark color="blue-grey" dense>
+            <v-menu bottom right>
+              <template v-slot:activator="{ on }">
+                <v-btn icon v-on="on">
+                  <v-icon>mdi-clock</v-icon>
+                </v-btn>
+              </template>
+              <v-list>
+                <v-list-item two-line @click="moveSelectedEntryTo(nextMonday.format('YYYY-MM-DD'))">
+                  <v-list-item-content>
+                    <v-list-item-title>Next week</v-list-item-title>
+                    <v-list-item-subtitle>{{ nextMonday.format('ddd, MMM Do') }}
+                    </v-list-item-subtitle>
+                  </v-list-item-content>
+                </v-list-item>
+                <v-list-item @click="moveSelectedEntryTo(nextSaturday.format('YYYY-MM-DD'))">
+                  <v-list-item-content>
+                    <v-list-item-title>Next weekend</v-list-item-title>
+                    <v-list-item-subtitle>{{ nextSaturday.format('ddd, MMM Do') }}
+                    </v-list-item-subtitle>
+                  </v-list-item-content>
+                </v-list-item>
+                <v-list-item @click="showMoveToDateCalendar = true">
+                  <v-list-item-content>
+                    <v-list-item-title>Select date</v-list-item-title>
+                  </v-list-item-content>
+                </v-list-item>
+              </v-list>
+            </v-menu>
+
+            <v-btn
+                icon
+                @click="deleteEntry">
+              <v-icon>mdi-delete-outline</v-icon>
+            </v-btn>
+
+            <v-spacer/>
+
+            <v-btn
+                icon
+                @click="unSelectEntry">
+              <v-icon>mdi-close</v-icon>
+            </v-btn>
+          </v-toolbar>
+
+          <v-textarea flat auto-grow class="pa-2" v-model="selectedEntryCopy.text"></v-textarea>
+
+          <v-card-actions>
+            <v-btn text color="primary" @click="saveEditingEntry">
+              Save changes
+            </v-btn>
+          </v-card-actions>
+        </v-card>
+      </v-dialog>
+
+
       <v-dialog v-model="showNoteSelectionView"
                 fullscreen
                 hide-overlay
@@ -326,7 +354,7 @@
         color="info">
       {{ snackbarText }}
     </v-snackbar>
-    <v-bottom-navigation app v-if="selectedEntryId === false">
+    <v-bottom-navigation app v-if="selectedEntry === undefined">
       <v-list-item class="pl-0">
         <v-list-item-action class="mr-0" v-if="newEntry.startsWith(' ')">
           <v-checkbox/>
@@ -343,7 +371,6 @@
             rows="1"
             placeholder="Type new entry here"
             class="font-italic"
-            @focus="selectedEntryId = false"
         />
       </v-list-item>
     </v-bottom-navigation>
@@ -369,13 +396,13 @@
 
       newEntry: '',
 
-      selectedEntryId: false,
-
       lastOpenedListBeforeSwitch: '',
 
       editingNoteTitle: '',
 
       newNoteTitle: '',
+
+      selectedEntryCopy: {},
 
       newNoteRepeatFrequency: '',
       newNoteRepeatFrom: '',
@@ -407,11 +434,13 @@
         'lists',
         'schedules',
         'selectedListName',
+        'selectedEntryIndex',
       ]),
       ...mapGetters([
         'appBarTitle',
         'appBarSubtitle',
         'selectedList',
+        'selectedEntry',
         'nextMonday',
         'nextSaturday',
         'isDatesMode',
@@ -425,6 +454,18 @@
       'newEntry': 'newEntryUpdated',
     },
     methods: {
+      saveEditingEntry() {
+          this.$store.commit('setEntry', {...this.selectedEntryCopy, modifiedAt: new Date()});
+          this.unSelectEntry();
+      },
+      unSelectEntry() {
+        this.$store.commit('selectEntry', false);
+        this.selectedEntryCopy = {};
+      },
+      selectEntry(index) {
+        this.$store.commit('selectEntry', index);
+        this.selectedEntryCopy = { ...this.selectedEntry };
+      },
       swipeLeft() {
         if (isDate(this.selectedListName)) {
           const newDate = moment(this.selectedListName).add(1, 'd');
@@ -451,8 +492,7 @@
         this.$store.commit('toggleTodoEntry', entryId);
       },
       deleteEntry() {
-        this.$store.commit('deleteEntry', { listName: this.selectedListName, entryId: this.selectedEntryId });
-        this.selectedEntryId = false;
+        this.$store.commit('deleteEntry', { listName: this.selectedListName, entryId: this.selectedEntry.id });
       },
       scheduleRepeats() {
         console.debug('Checking for rescheduling');
@@ -595,8 +635,8 @@
           existingNote = 'Inbox';
         }
 
-        this.selectedEntryId = false;
         this.showEditNote = false;
+        this.$store.commit('selectEntry', false);
         this.$store.commit('selectList', existingNote);
       },
       saveEditingNote() {
@@ -669,12 +709,12 @@
         this.$store.commit('moveEntry', {
           fromListName: this.selectedListName,
           toListName: dateStr,
-          entryId: this.selectedEntryId,
+          entryId: this.selectedEntry.id,
         });
 
         // Close calendar picker if open
         this.showMoveToDateCalendar = false;
-        this.selectedEntryId = false;
+        this.$store.commit('selectEntry', false);
 
         // Message
         this.showSnackbar = true;
@@ -685,7 +725,7 @@
         // close dialogs
         this.showListView = false;
         // Clear selections in case
-        this.selectedEntryId = false;
+        this.$store.commit('selectEntry', false);
       },
       copyContent(event) {
         event.target.select();

@@ -55,6 +55,7 @@ export default new Vuex.Store({
     lists: {},
     schedules: {},
     selectedListName: '',
+    selectedEntryIndex: false,
   },
   getters: {
     appBarTitle: state => {
@@ -83,6 +84,25 @@ export default new Vuex.Store({
     },
     selectedList: state => {
       return state.selectedListName !== '' ? state.lists[state.selectedListName] : [];
+    },
+    selectedEntry: state => {
+      const { selectedListName, lists, selectedEntryIndex } = state;
+
+      if (typeof selectedListName !== 'string' || selectedListName.length < 1) {
+        return undefined;
+      }
+
+      const list = lists[selectedListName];
+
+      if (!list || typeof list.length !== 'number' || list.length < 1) {
+        return undefined;
+      }
+
+      if (typeof selectedEntryIndex !== 'number' || selectedEntryIndex < 0) {
+        return undefined;
+      }
+
+      return list[selectedEntryIndex];
     },
     nextMonday: () => {
       return moment().day(7 + 1);
@@ -130,13 +150,12 @@ export default new Vuex.Store({
     },
   },
   mutations: {
-    loadLists(state, lists) {
-      state.lists = lists;
-    },
     selectList(state, name) {
       state.selectedListName = name;
     },
-
+    selectEntry(state, index) {
+      state.selectedEntryIndex = index;
+    },
     addEntry(state, payload) {
       const { listName, text, isTodo } = payload;
 
@@ -164,8 +183,22 @@ export default new Vuex.Store({
       const existingEntries = state.lists[listName] || [];
 
       Vue.set(state.lists, listName, [ ...existingEntries, newEntryObj ]);
-    }
-    ,
+    },
+    setEntry(state, newEntry) {
+      const { selectedListName, selectedEntryIndex } = state;
+
+      if (typeof selectedListName === 'string' && selectedListName.length > 0
+      && typeof selectedEntryIndex === 'number' && selectedEntryIndex >= 0) {
+
+        const list = [...state.lists[selectedListName]];
+        list[selectedEntryIndex] = newEntry;
+        Vue.set(
+          state.lists,
+          selectedListName,
+          list,
+        );
+      }
+    },
     moveNotCompleted(state) {
       const entriesToMove = [];
 
@@ -217,8 +250,9 @@ export default new Vuex.Store({
         listName,
         state.lists[listName].filter(val => val.id !== entryId),
       );
-    }
-    ,
+
+      state.selectedEntryIndex = false;
+    },
     moveEntry(state, payload) {
       const { fromListName, toListName, entryId } = payload;
 
@@ -243,13 +277,11 @@ export default new Vuex.Store({
         toListName,
         [ ...existingEntries, { ...entry } ],
       );
-    }
-    ,
+    },
     deleteList(state, name) {
       Vue.delete(state.lists, name);
       Vue.delete(state.schedules, name);
-    }
-    ,
+    },
     moveList(state, payload) {
       // WARNING - IF dest EXISTS, IT WILL BE REPLACED.
       // MAKE SURE THIS IS WHAT YOU WANT TO DO BEFORE CALLING THIS FUNC
@@ -279,17 +311,14 @@ export default new Vuex.Store({
     },
     addList(state, name) {
       Vue.set(state.lists, name, []);
-    }
-    ,
+    },
     setSchedule(state, payload) {
       const { listName, scheduleObj } = payload;
       Vue.set(state.schedules, listName, scheduleObj);
-    }
-    ,
+    },
     deleteSchedule(state, name) {
       Vue.delete(state.schedules, name);
-    }
-    ,
+    },
     copyEntries(state, payload) {
       const { fromListName, toListName } = payload;
       const entries = state.lists[fromListName] || [];
