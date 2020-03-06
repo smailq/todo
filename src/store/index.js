@@ -6,7 +6,7 @@ const moment = require('moment');
 
 const vuexLocal = new VuexPersistence({
   key: 'todo',
-  storage: window.localStorage
+  storage: window.localStorage,
 });
 
 
@@ -49,7 +49,7 @@ function todayStr() {
 }
 
 export default new Vuex.Store({
-  plugins: [vuexLocal.plugin],
+  plugins: [ vuexLocal.plugin ],
   state: {
     lists: {},
     schedules: {},
@@ -57,39 +57,26 @@ export default new Vuex.Store({
   },
   getters: {
     appBarTitle: state => {
-      if (!isDate(state.selectedListName)) {
+      if (isDate(state.selectedListName)) {
+        const selectedDate = moment(state.selectedListName);
+        if (selectedDate.isSame(moment(), 'day')) {
+          return 'Today';
+        } else if (selectedDate.isSame(moment().add(1, 'days'), 'day')) {
+          return 'Tomorrow';
+        } else if (selectedDate.isSame(moment().subtract(1, 'days'), 'day')) {
+          return 'Yesterday';
+        } else {
+          const today = moment().hour(0).minute(0).second(0).millisecond(0);
+          return selectedDate.from(today);
+        }
+      } else {
         // Notes mode, just show list name as title
         return state.selectedListName;
-      } else {
-        // We are in dates mode, show more informative title
-        const selectedDate = moment(state.selectedListName);
-        return selectedDate.calendar(null, {
-          sameDay: '[Today]',
-          nextDay: '[Tomorrow]',
-          nextWeek: 'ddd, MMM D',
-          lastDay: '[Yesterday]',
-          lastWeek: 'ddd, MMM D',
-          sameElse: 'ddd, MMM D',
-        });
       }
     },
     appBarSubtitle: state => {
       if (isDate(state.selectedListName)) {
-        const selectedDate = moment(state.selectedListName);
-        if (selectedDate.isSame(moment(), 'day')
-          || selectedDate.isSame(moment().add(1, 'days'), 'day')
-          || selectedDate.isSame(moment().subtract(1, 'days'), 'day')) {
-          return selectedDate.calendar(null, {
-            sameDay: 'ddd, MMM D',
-            nextDay: 'ddd, MMM D',
-            nextWeek: '',
-            lastDay: 'ddd, MMM D',
-            lastWeek: '',
-            sameElse: '',
-          });
-        } else {
-          return '';
-        }
+        return moment(state.selectedListName).format('ddd, MMM D');
       }
       return '';
     },
