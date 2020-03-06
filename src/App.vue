@@ -80,8 +80,8 @@
     <v-content>
       <v-container fill-height class="align-content-start pt-0"
                    v-touch="{
-                     left: () => $store.commit('selectNextDay'),
-                     right: () => $store.commit('selectPrevDay'),
+                     left: () => swipeLeft(),
+                     right: () => swipeRight(),
                    }"
       >
         <v-row class="ml-0">
@@ -124,16 +124,16 @@
             </v-list-item>
           </v-list>
         </v-row>
-        <v-row class="justify-end ml-0"
-               v-if="schedules[selectedListName] === undefined && isNotesMode && lists[selectedListName] && lists[selectedListName].length > 0">
-          <v-btn
-              small text class="mt-4"
-              color="blue-grey darken-2"
-              @click="showAutoRepeatDialog = true"
-          >
-            Enable auto repeat
-          </v-btn>
-        </v-row>
+        <!--        <v-row class="justify-end ml-0"-->
+        <!--               v-if="schedules[selectedListName] === undefined && isNotesMode && lists[selectedListName] && lists[selectedListName].length > 0">-->
+        <!--          <v-btn-->
+        <!--              small text class="mt-4"-->
+        <!--              color="blue-grey darken-2"-->
+        <!--              @click="showAutoRepeatDialog = true"-->
+        <!--          >-->
+        <!--            Enable auto repeat-->
+        <!--          </v-btn>-->
+        <!--        </v-row>-->
         <v-card
             class="mt-4"
             color="blue-grey"
@@ -360,7 +360,14 @@
 </template>
 
 <script>
+
+  // Checks if the string looks like a date
+  function isDate(str) {
+    return /^\d\d\d\d-\d\d-\d\d$/.test(str);
+  }
+
   import {mapState, mapGetters} from 'vuex';
+
   const moment = require('moment');
 
   export default {
@@ -427,11 +434,33 @@
       'newEntry': 'newEntryUpdated',
     },
     methods: {
+      swipeLeft() {
+        if (isDate(this.selectedListName)) {
+          const newDate = moment(this.selectedListName).add(1, 'd');
+          this.$store.commit('selectList', newDate.format('YYYY-MM-DD'));
+        } else {
+          const index = this.noteListNames.indexOf(this.selectedListName);
+          if (index < this.noteListNames.length - 1) {
+            this.$store.commit('selectList', this.noteListNames[index + 1]);
+          }
+        }
+      },
+      swipeRight() {
+        if (isDate(this.selectedListName)) {
+          const newDate = moment(this.selectedListName).subtract(1, 'd');
+          this.$store.commit('selectList', newDate.format('YYYY-MM-DD'));
+        } else {
+          const index = this.noteListNames.indexOf(this.selectedListName);
+          if (index > 0) {
+            this.$store.commit('selectList', this.noteListNames[index - 1]);
+          }
+        }
+      },
       checked() {
         // console.log('asrerer');
       },
       deleteEntry() {
-        this.$store.commit('deleteEntry', { listName: this.selectedListName, entryId: this.selectedEntryId});
+        this.$store.commit('deleteEntry', { listName: this.selectedListName, entryId: this.selectedEntryId });
         this.selectedEntryId = false;
       },
       scheduleRepeats() {
@@ -470,12 +499,12 @@
 
             this.$store.commit(
               'copyEntries',
-              {fromListName: listName, toListName: listData.nextRepeatOn}
-              );
+              { fromListName: listName, toListName: listData.nextRepeatOn },
+            );
 
             // Advance next date
             listData.nextRepeatOn = nextDate;
-            this.$store.commit('setSchedule', {listName, scheduleObj: listData});
+            this.$store.commit('setSchedule', { listName, scheduleObj: listData });
           }
         }
       },
@@ -572,7 +601,7 @@
 
         if (existingNote === false) {
           // No other existing note to open, create an untitled one. (without saving)
-          existingNote = 'Untitled';
+          existingNote = 'Inbox';
         }
 
         this.selectedEntryId = false;
@@ -613,10 +642,9 @@
       },
       titleClicked() {
         if (this.isDatesMode) {
-          this.$store.commit('selectList', this.todayStr);
+          this.$store.commit('selectList', moment().format('YYYY-MM-DD'));
         } else if (this.isNotesMode) {
-          this.editingNoteTitle = this.selectedListName;
-          this.showEditNote = true;
+          this.$store.commit('selectList', 'Inbox');
         }
       },
       selectNote(name) {
@@ -628,9 +656,9 @@
         this.lastOpenedListBeforeSwitch = this.selectedListName;
 
         if (this.isDatesMode) {
-          // If there are no notes, create one called 'Untitled' and open that
+          // If there are no notes, create one called 'Inbox' and open that
           if (this.noteListNames.length < 1) {
-            this.$store.commit('selectList', 'Untitled');
+            this.$store.commit('selectList', 'Inbox');
           } else if (prevList !== '') {
             // Show last opened note
             this.$store.commit('selectList', prevList);

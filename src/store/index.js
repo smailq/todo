@@ -134,22 +134,8 @@ export default new Vuex.Store({
     },
     selectList(state, name) {
       state.selectedListName = name;
-    }
-    ,
-    selectNextDay(state) {
-      if (isDate(state.selectedListName)) {
-        const newDate = moment(state.selectedListName).add(1, 'd');
-        state.selectedListName = newDate.format('YYYY-MM-DD');
-      }
-    }
-    ,
-    selectPrevDay(state) {
-      if (isDate(state.selectedListName)) {
-        const newDate = moment(state.selectedListName).subtract(1, 'd');
-        state.selectedListName = newDate.format('YYYY-MM-DD');
-      }
-    }
-    ,
+    },
+
     addEntry(state, payload) {
       const { listName, text, isTodo } = payload;
 
