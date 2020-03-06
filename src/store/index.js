@@ -49,6 +49,7 @@ function todayStr() {
 }
 
 export default new Vuex.Store({
+  strict: true,
   plugins: [ vuexLocal.plugin ],
   state: {
     lists: {},
@@ -302,12 +303,11 @@ export default new Vuex.Store({
           }),
         ],
       );
-    }
-    ,
-    toggleTodoEntry(state, payload) {
-      const { listName, entryId } = payload;
+    },
+    toggleTodoEntry(state, entryId) {
+      const { selectedListName } = state;
 
-      const list = state.lists[listName];
+      const list = state.lists[selectedListName];
       const entry = list.find(v => v.id === entryId);
 
       if (!entry.isTodo) {
@@ -315,12 +315,13 @@ export default new Vuex.Store({
       }
 
       entry.completed = !entry.completed;
-    }
-    ,
 
-  }
-  ,
-  actions: {}
-  ,
-})
-;
+      Vue.set(
+        state.lists,
+        selectedListName,
+        list,
+      );
+    },
+  },
+  actions: {},
+});

@@ -78,62 +78,53 @@
 
     </v-app-bar>
     <v-content>
-      <v-container fill-height class="align-content-start pt-0"
+      <v-container fluid
+                   fill-height
+                   class="pa-0 align-content-start"
                    v-touch="{
                      left: () => swipeLeft(),
                      right: () => swipeRight(),
                    }"
       >
-        <v-row class="ml-0">
-          <v-list dense class="flex-grow-1">
-            <v-list-item v-for="(entry) in selectedList" :key="entry.id"
-                         class="pl-0 pr-0">
-              <v-list-item-action class="mr-0" v-if="entry.isTodo">
-                <v-checkbox
-                    v-model="entry.completed"
-                    @change="checked"
-                />
-              </v-list-item-action>
-              <v-list-item-action v-else-if="entry.isLink" class="mr-0">
-                <a :href="entry.text" target="_blank" style="text-decoration: none;">
-                  <v-icon color="blue darken-2">mdi-link</v-icon>
-                </a>
-              </v-list-item-action>
-              <v-list-item-action v-else class="mr-0">
-                <v-icon>mdi-circle-small</v-icon>
-              </v-list-item-action>
-              <v-textarea
-                  :class="`pr-1 ${entry.completed && 'completed'}`"
-                  v-model="entry.text"
-                  auto-grow
-                  flat
-                  solo
-                  full-width
-                  dense
-                  :outlined="selectedEntryId === entry.id"
-                  hide-details
-                  rows="1"
-                  @focus="selectedEntryId = entry.id"
+        <v-list class="flex-grow-1">
+          <v-list-item v-for="entry in selectedList" :key="entry.id">
+            <v-list-item-action v-if="entry.isTodo" class="mr-3">
+              <v-checkbox
+                  :input-value="entry.completed"
+                  @change="toggleCompleted(entry.id)"
               />
-              <small class="red--text" v-if="entry.delayCount">
-                {{ entry.delayCount }}
-              </small>
-              <v-icon small v-if="entry.isRepeating">
-                mdi-repeat
-              </v-icon>
-            </v-list-item>
-          </v-list>
+            </v-list-item-action>
+            <v-list-item-action v-else-if="entry.isLink" class="mr-3">
+              <a :href="entry.text" target="_blank" style="text-decoration: none;">
+                <v-icon color="blue darken-2">mdi-link</v-icon>
+              </a>
+            </v-list-item-action>
+            <v-list-item-action v-else class="mr-3">
+              <v-icon>mdi-circle-small</v-icon>
+            </v-list-item-action>
+            <v-list-item-content>
+              <v-list-item-title style="white-space:normal;" :class="`body-1 ${entry.completed ? 'completed' : ''}`">
+                {{ entry.text }}
+                <small class="red--text" v-if="entry.delayCount">
+                  {{ entry.delayCount }}
+                </small>
+              </v-list-item-title>
+            </v-list-item-content>
+            <v-list-item-icon v-if="entry.isRepeating">
+              <v-icon small>mdi-repeat</v-icon>
+            </v-list-item-icon>
+          </v-list-item>
+        </v-list>
+        <v-row class="justify-end ml-0"
+               v-if="schedules[selectedListName] === undefined && isNotesMode && lists[selectedListName] && lists[selectedListName].length > 0">
+          <v-btn
+              small text class="mt-4"
+              color="blue-grey darken-2"
+              @click="showAutoRepeatDialog = true"
+          >
+            Enable auto repeat
+          </v-btn>
         </v-row>
-        <!--        <v-row class="justify-end ml-0"-->
-        <!--               v-if="schedules[selectedListName] === undefined && isNotesMode && lists[selectedListName] && lists[selectedListName].length > 0">-->
-        <!--          <v-btn-->
-        <!--              small text class="mt-4"-->
-        <!--              color="blue-grey darken-2"-->
-        <!--              @click="showAutoRepeatDialog = true"-->
-        <!--          >-->
-        <!--            Enable auto repeat-->
-        <!--          </v-btn>-->
-        <!--        </v-row>-->
         <v-card
             class="mt-4"
             color="blue-grey"
@@ -456,8 +447,8 @@
           }
         }
       },
-      checked() {
-        // console.log('asrerer');
+      toggleCompleted(entryId) {
+        this.$store.commit('toggleTodoEntry', entryId);
       },
       deleteEntry() {
         this.$store.commit('deleteEntry', { listName: this.selectedListName, entryId: this.selectedEntryId });
@@ -745,7 +736,7 @@
   };
 </script>
 <style>
-  .v-textarea.completed textarea {
+  .v-list-item__title.completed {
     text-decoration: line-through;
     color: gray !important;
   }
