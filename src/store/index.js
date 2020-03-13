@@ -240,8 +240,7 @@ export default new Vuex.Store({
           ...entriesToMove,
         ],
       );
-    }
-    ,
+    },
     deleteEntry(state, payload) {
       const { listName, entryId } = payload;
 
